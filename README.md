@@ -1,72 +1,75 @@
 # TeamFreelanceML / STT_TTS
 
-A production-grade, Unified Speech-to-Text (STT) and Text-to-Speech (TTS) Monorepo. This repository provides a complete end-to-end solution for guided reading, real-time highlighting, and pedagogical evaluation.
+A production-grade, Unified Speech-to-Text (STT) and Text-to-Speech (TTS) Monorepo. Optimized for sub-100ms latency, zero-configuration deployment, and high-fidelity pedagogical evaluation.
 
 ---
 
-## 🚀 Key Features
-
-### 1. Real-Time Highlighting (STT)
-- **Neural Engine**: Uses `Sherpa-ONNX` (WASM) for sub-100ms word-level tracking.
-- **Resilient**: Handles children's speech and background noise via local inference.
-- **Guided Experience**: Context-aware blurring of non-active passage text.
-
-### 2. Deep-Report Evaluation
-- **Whisper Inference**: Uses OpenAI's Whisper `base` for high-accuracy session transcription.
-- **Pedagogical Metrics**: Detailed scoring of Accuracy, Fluency (WCPM), and Chunking.
-- **Error Analysis**: Detects wrong words, skips, repetitions, and extra words.
-
-### 3. Production TTS (Kokoro)
-- **Engine**: FastAPI-based orchestration of the Kokoro ONNX model.
-- **Pre-warming**: Intelligent caching to ensure zero-latency word-level help.
-- **Admin Dashboard**: Dedicated panel for managing voices and system stats.
-
----
-
-## 🏗️ Architecture
-
-```text
-TeamFreelanceML/STT_TTS
-├── frontend/          # Next.js 16 App (Guided Reading UI)
-├── backend/           # FastAPI Evaluation Service (Whisper)
-├── tts/               # FastAPI Narration Service (Kokoro)
-│   └── admin-panel/   # Next.js Management Dashboard
-└── docker-compose.yml # Unified Orchestration
-```
-
----
-
-## 🛠️ Quick Start (Production)
+## 🚀 Deployment & Setup
 
 ### 1. Requirements
-- Docker & Docker Compose
-- Windows (WSL2 recommended), Linux, or macOS
+- **Docker & Docker Compose**
+- **Hardware**: Minimum 4GB RAM (8GB recommended for Whisper/Kokoro inference).
+- **Environment**: Linux, macOS, or Windows (WSL2).
 
-### 2. Launching the Stack
-Clone the repository and run:
+### 2. One-Click Launch
+The entire stack is containerized. To start everything:
 ```bash
 docker compose up --build
 ```
-The system will automatically download all required neural weights (~1GB) during the build phase.
+*Note: The first build will take 5-10 minutes as it downloads approximately 1.5GB of neural model weights (Whisper, Kokoro, and Sherpa).*
 
-### 3. Accessing Services
-- **Main Reader**: [http://localhost:3000](http://localhost:3000)
-- **Production Backend**: [http://localhost:8000](http://localhost:8000)
-- **TTS Generator**: [http://localhost:8001](http://localhost:8001)
-- **Admin Dashboard**: [http://localhost:8002](http://localhost:8002)
-
----
-
-## 🔒 Security & Performance
-- **COOP/COEP Headers**: Enforced to enable `SharedArrayBuffer` for the neural highlighter.
-- **Unified Stream**: Shared microphone architecture prevents hardware resource conflicts.
-- **Internal Proxying**: All service discovery is handled via internal Docker networking—no static IPs required.
+### 3. Service Access
+| Service | URL | Description |
+| :--- | :--- | :--- |
+| **Main Web App** | [http://localhost:3000](http://localhost:3000) | The primary student reading interface. |
+| **TTS Admin Panel** | [http://localhost:8002](http://localhost:8002) | Management dashboard for voices and stats. |
+| **Evaluation API** | [http://localhost:8000](http://localhost:8000) | STT processing and scoring backend. |
+| **Narration API** | [http://localhost:8001](http://localhost:8001) | Neural TTS generation backend. |
 
 ---
 
-## 📜 Repository Structure & Audit
-This code has undergone a **System Engineering Audit** to ensure it is battery-included and production-ready. 
-- **Relative Pathing**: Every asset (WASM, Models) is addressed via relative paths inside the container.
-- **Reverse Proxy**: Next.js serves as the entry point, routing requests to internal containers securely.
+## 🧠 Model Architecture
 
-Developed by **Antigravity** for **TeamFreelanceML**.
+### **Frontend Models (Local Browser Inference)**
+- **Engine**: `Sherpa-ONNX` (WASM Runtime).
+- **Purpose**: Real-time word tracking and highlighting.
+- **Benefits**: Runs locally in the student's browser. This ensures **zero network latency** during reading, protecting the experience even on unstable Wi-Fi.
+- **Assets**: Uses a Zipformer-based transducer model (`encoder`, `decoder`, `joiner`) and a `tokens.txt` vocabulary.
+
+### **Backend Models (Server-Side Inference)**
+- **STT Evaluation**: `OpenAI Whisper (base)`. 
+  - **Purpose**: High-fidelity session transcription for final accuracy and fluency scoring (WCPM).
+- **TTS Narration**: `Kokoro-82M`.
+  - **Purpose**: High-quality neural voice generation for reading assistance and "Deep-Narration" of full stories.
+
+---
+
+## 🔌 API Endpoints (Front-Face)
+
+The system uses an internal **Reverse Proxy**. You should always talk to the Frontend (`Port 3000`) for API requests in production.
+
+### **TTS & Narration** (`/api/tts/`)
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/tts/narrate/word` | `POST` | Generates audio for a single word (used for 6-second helper). |
+| `/api/tts/narrate` | `POST` | Starts a full story narration job (returns `job_id`). |
+| `/api/tts/narrate/{id}` | `GET` | Poll status/results of a narration job. |
+| `/api/tts/voices` | `GET` | Returns a list of all 300+ available high-quality voices. |
+| `/audio/{filename}` | `GET` | Proxied access to the physical audio files generated by the engine. |
+
+### **STT & Evaluation** (`/api/evaluation/`)
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/evaluation/evaluate`| `POST` | Uploads full session audio (`webm`) for Whisper transcription and pedagogical scoring. |
+| `/api/evaluation/health`  | `GET` | Check if the Whisper neural engine is ready. |
+
+---
+
+## 🔒 Security & Networking
+- **Unified Microphone**: The application uses a single "Hardware Handle" for the microphone, sharing the stream between the live highlighter and the recorder to prevent hardware lockups.
+- **WASM Hardening**: Next.js is configured with `Cross-Origin-Opener-Policy: same-origin` to allow high-performance memory access for the Sherpa engine.
+- **Service Mesh**: Containers communicate via internal Docker DNS (`http://tts-api`, `http://backend`). No static server IPs need to be configured.
+
+---
+
+Developed and Audited by **Antigravity** for **TeamFreelanceML**.
