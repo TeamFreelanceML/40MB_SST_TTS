@@ -42,17 +42,25 @@ if project_root not in sys.path:
 from utils.config import settings
 
 
-def check_redis() -> bool:
-    """Check Redis is reachable before starting workers."""
-    try:
-        import redis
-        r = redis.Redis.from_url(settings.REDIS_URL)
-        r.ping()
-        print(f"[OK] Redis connected to {settings.REDIS_URL}")
-        return True
-    except Exception as e:
-        print(f"[ERROR] Redis not reachable on {settings.REDIS_URL}: {e}")
-        return False
+def check_redis(retries: int = 5, delay: int = 2) -> bool:
+    """Check Redis is reachable before starting workers, with self-healing retries."""
+    import redis
+    url = settings.REDIS_URL
+    
+    for attempt in range(1, retries + 1):
+        try:
+            r = redis.Redis.from_url(url, socket_timeout=5)
+            r.ping()
+            print(f"[OK] Redis connected to {url} (Attempt {attempt})")
+            return True
+        except Exception as e:
+            if attempt < retries:
+                print(f"[WAIT] Redis not reachable on {url} (Attempt {attempt}/{retries}). Retrying in {delay}s...")
+                time.sleep(delay)
+            else:
+                print(f"[ERROR] Redis failed after {retries} attempts: {e}")
+                return False
+    return False
 
 
 def check_models() -> bool:
