@@ -40,15 +40,15 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/evaluation/:path*',
-        destination: `${process.env.BACKEND_URL || 'http://127.0.0.1:8000'}/:path*`,
+        destination: `${process.env.BACKEND_URL || 'http://backend:8000'}/:path*`,
       },
       {
         source: '/api/tts/:path*',
-        destination: `${process.env.TTS_API_URL || 'http://127.0.0.1:8001'}/:path*`,
+        destination: `${process.env.TTS_API_URL || 'http://tts-api:8001'}/:path*`,
       },
       {
         source: '/audio/:path*',
-        destination: `${process.env.TTS_API_URL || 'http://127.0.0.1:8001'}/audio/:path*`,
+        destination: `${process.env.TTS_API_URL || 'http://tts-api:8001'}/audio/:path*`,
       },
     ];
   },
