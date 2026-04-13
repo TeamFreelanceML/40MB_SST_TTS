@@ -1,7 +1,7 @@
 version: "3.9"
 
 services:
-  # --- STT Backend (DeepReport Evaluation) ---
+  # --- STT Backend ---
   backend:
     build:
       context: ./backend
@@ -20,11 +20,11 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
-      timeout: 10s
-      start_period: 90s
-      retries: 3
+      timeout: 15s
+      start_period: 300s
+      retries: 5
 
-  # --- TTS Redis (Cache & Task Broker) ---
+  # --- TTS Redis ---
   redis:
     image: redis:7-alpine
     container_name: readaloud-redis
@@ -42,11 +42,10 @@ services:
     networks:
       - readaloud-net
 
-  # --- TTS API (Kokoro Generation) ---
+  # --- TTS API ---
   tts-api:
     build:
       context: ./tts
-      dockerfile: Dockerfile
     container_name: readaloud-tts-api
     restart: unless-stopped
     ports:
@@ -54,10 +53,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
       - PORT=8001
-      - TTS_API_KEY=${TTS_API_KEY:-}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
     volumes:
-      - audio_cache:/app/audio_cache
+      - tts_audio_cache:/app/audio_cache
       - tts_weights:/app/weights
     depends_on:
       redis:
@@ -65,17 +62,16 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
-      timeout: 10s
-      start_period: 90s
-      retries: 3
+      timeout: 15s
+      start_period: 300s
+      retries: 5
     networks:
       - readaloud-net
 
-  # --- TTS Admin Panel (Dashboard) ---
+  # --- TTS Admin Panel ---
   tts-admin:
     build:
       context: ./tts/admin-panel
-      dockerfile: Dockerfile
     container_name: readaloud-tts-admin
     restart: unless-stopped
     ports:
@@ -88,10 +84,11 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
-      timeout: 10s
-      retries: 3
+      timeout: 15s
+      start_period: 60s
+      retries: 5
 
-  # --- Main Frontend (Guided Reading) ---
+  # --- Main Frontend ---
   frontend:
     build:
       context: ./frontend
@@ -111,7 +108,7 @@ networks:
     driver: bridge
 
 volumes:
-  redis_data:
-  audio_cache:
   whisper_models:
+  redis_data:
+  tts_audio_cache:
   tts_weights:

@@ -40,6 +40,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from utils.config import settings
+from download_models import download_tts_models
 
 
 def check_redis(retries: int = 5, delay: int = 2) -> bool:
@@ -157,7 +158,16 @@ def main():
         sys.exit(1)
 
     if not check_models():
-        sys.exit(1)
+        print("[*] Triggering automatic model download...")
+        try:
+            download_tts_models()
+            # Double check after download
+            if not check_models():
+                print("[ERROR] Models still invalid after download.")
+                sys.exit(1)
+        except Exception as e:
+            print(f"[ERROR] Auto-download failed: {e}")
+            sys.exit(1)
 
     worker_count     = args.workers or get_worker_count()
     port             = args.port
