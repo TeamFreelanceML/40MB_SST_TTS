@@ -122,7 +122,7 @@ export default function ReadingApp() {
 
       const resolvedAudioUrl = audioUrl.startsWith("http")
         ? audioUrl
-        : new URL(audioUrl, TTS_WORD_API_URL).toString();
+        : new URL(audioUrl, window.location.origin).toString();
 
       const helperAudio = new Audio(resolvedAudioUrl);
       helperAudioRef.current = helperAudio;

@@ -37,21 +37,18 @@ const nextConfig: NextConfig = {
    * Fallback to localhost if running outside Docker.
    */
   async rewrites() {
-    const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
-    const TTS_URL = process.env.TTS_API_URL || "http://localhost:8001";
-
     return [
       {
-        source: "/api/tts/:path*",
-        destination: `${TTS_URL}/:path*`,
+        source: '/api/evaluation/:path*',
+        destination: `${process.env.BACKEND_URL || 'http://127.0.0.1:8000'}/:path*`,
       },
       {
-        source: "/audio/:path*",
-        destination: `${TTS_URL}/audio/:path*`,
+        source: '/api/tts/:path*',
+        destination: `${process.env.TTS_API_URL || 'http://127.0.0.1:8001'}/:path*`,
       },
       {
-        source: "/api/evaluation/:path*",
-        destination: `${BACKEND_URL}/:path*`,
+        source: '/audio/:path*',
+        destination: `${process.env.TTS_API_URL || 'http://127.0.0.1:8001'}/audio/:path*`,
       },
     ];
   },
