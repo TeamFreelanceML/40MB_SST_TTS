@@ -1,25 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-
-// ---------------------------------------------------------------------------
-// Fonts — bundled locally via next/font/google to avoid COOP/COEP issues
-// with external <link> requests
-// ---------------------------------------------------------------------------
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["400", "500", "600", "700"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains",
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["400", "500"],
-});
 
 // ---------------------------------------------------------------------------
 // SEO Metadata
@@ -52,9 +32,11 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className="h-full antialiased selection:bg-blue-500/30"
     >
-      <body suppressHydrationWarning className="min-h-full flex flex-col">{children}</body>
+      <body suppressHydrationWarning className="min-h-full flex flex-col font-sans">
+        {children}
+      </body>
     </html>
   );
 }
