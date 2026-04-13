@@ -100,6 +100,9 @@ services:
         condition: service_healthy
       tts-api:
         condition: service_healthy
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - TTS_API_URL=http://tts-api:8001
     networks:
       - readaloud-net
 

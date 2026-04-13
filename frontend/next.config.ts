@@ -34,20 +34,24 @@ const nextConfig: NextConfig = {
   /**
    * Production Proxy:
    * Redirects /api/ and /audio/ requests to the internal Docker services.
+   * Fallback to localhost if running outside Docker.
    */
   async rewrites() {
+    const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+    const TTS_URL = process.env.TTS_API_URL || "http://localhost:8001";
+
     return [
       {
         source: "/api/tts/:path*",
-        destination: "http://tts-api:8001/:path*",
+        destination: `${TTS_URL}/:path*`,
       },
       {
-        source: "/audio/:path*", // [FINAL BUGFIX] Proxy audio files from TTS engine
-        destination: "http://tts-api:8001/audio/:path*",
+        source: "/audio/:path*",
+        destination: `${TTS_URL}/audio/:path*`,
       },
       {
         source: "/api/evaluation/:path*",
-        destination: "http://backend:8000/:path*",
+        destination: `${BACKEND_URL}/:path*`,
       },
     ];
   },
