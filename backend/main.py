@@ -136,6 +136,15 @@ async def evaluate_reading(
 async def health_check():
     return {"status": "healthy", "service": "judge-api-v2.0.1", "model": f"whisper-{MODEL_NAME}"}
 
+class AccessLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        # Filter out high-frequency polling that clutters the terminal
+        return not any(path in msg for path in ["/health", "/stats", "/jobs"])
+
 if __name__ == "__main__":
     logger.info(f"[DAEMON] AI Judge Server waking up on Port {API_PORT}...")
+    # Suppress health check spam from Uvicorn access logs
+    # Suppress high-frequency polling spam from Uvicorn access logs
+    logging.getLogger("uvicorn.access").addFilter(AccessLogFilter())
     uvicorn.run(app, host=API_HOST, port=API_PORT)

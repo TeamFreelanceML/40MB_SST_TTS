@@ -18,22 +18,22 @@ const TARGET_DIR = path.resolve(__dirname, "..", "public", "sherpa-onnx");
 const ASSETS = [
   {
     name: "WASM API Script",
-    url: "https://huggingface.co/spaces/k2-fsa/web-assembly-asr-sherpa-onnx-en/resolve/06b73d8bedaf361bcd5cb1e378d3fa1573d73f12/sherpa-onnx-asr.js",
+    url: "https://huggingface.co/spaces/k2-fsa/web-assembly-asr-sherpa-onnx-en/resolve/6d17dc0b01eda25aaf0da49286edc9d1abe16305/sherpa-onnx-asr.js",
     saveAs: "sherpa-onnx.js",
   },
   {
     name: "WASM Glue Code",
-    url: "https://huggingface.co/spaces/k2-fsa/web-assembly-asr-sherpa-onnx-en/resolve/06b73d8bedaf361bcd5cb1e378d3fa1573d73f12/sherpa-onnx-wasm-main-asr.js",
+    url: "https://huggingface.co/spaces/k2-fsa/web-assembly-asr-sherpa-onnx-en/resolve/6d17dc0b01eda25aaf0da49286edc9d1abe16305/sherpa-onnx-wasm-main-asr.js",
     saveAs: "sherpa-onnx-wasm-main-asr.js",
   },
   {
     name: "WASM Binary",
-    url: "https://huggingface.co/spaces/k2-fsa/web-assembly-asr-sherpa-onnx-en/resolve/06b73d8bedaf361bcd5cb1e378d3fa1573d73f12/sherpa-onnx-wasm-main-asr.wasm",
+    url: "https://huggingface.co/spaces/k2-fsa/web-assembly-asr-sherpa-onnx-en/resolve/6d17dc0b01eda25aaf0da49286edc9d1abe16305/sherpa-onnx-wasm-main-asr.wasm",
     saveAs: "sherpa-onnx-wasm-main-asr.wasm",
   },
   {
     name: "WASM Data File",
-    url: "https://huggingface.co/spaces/k2-fsa/web-assembly-asr-sherpa-onnx-en/resolve/06b73d8bedaf361bcd5cb1e378d3fa1573d73f12/sherpa-onnx-wasm-main-asr.data",
+    url: "https://huggingface.co/spaces/k2-fsa/web-assembly-asr-sherpa-onnx-en/resolve/6d17dc0b01eda25aaf0da49286edc9d1abe16305/sherpa-onnx-wasm-main-asr.data",
     saveAs: "sherpa-onnx-wasm-main-asr.data",
   },
 ];

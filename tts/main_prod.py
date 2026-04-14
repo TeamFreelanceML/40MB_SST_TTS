@@ -60,6 +60,14 @@ from utils.logger import setup_logger
 
 logger = setup_logger("story_tts_api", settings.LOG_LEVEL, settings.JSON_LOGS)
 
+class AccessLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        # Suppress noise from Docker health checks and Admin Panel polling
+        return not any(path in msg for path in ["/health", "/stats", "/jobs"])
+
+logging.getLogger("uvicorn.access").addFilter(AccessLogFilter())
+
 # ── API Key auth ──────────────────────────────────────────────────────────────
 _API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 

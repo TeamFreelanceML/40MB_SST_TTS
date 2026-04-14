@@ -43,10 +43,13 @@ from utils.config import settings
 from download_models import download_tts_models
 
 
-def check_redis(retries: int = 5, delay: int = 2) -> bool:
+def check_redis(retries: int = 10, delay: int = 2) -> bool:
     """Check Redis is reachable before starting workers, with self-healing retries."""
     import redis
     url = settings.REDIS_URL
+    
+    # Small initial sleep to allow Docker DNS to propagate
+    time.sleep(1)
     
     for attempt in range(1, retries + 1):
         try:
