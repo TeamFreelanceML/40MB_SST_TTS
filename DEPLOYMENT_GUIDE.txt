@@ -14,8 +14,8 @@ Deployment Method: Docker Compose
 --- 2. FIRST-TIME DEPLOYMENT ---
 Run these commands in your terminal:
 
-   git clone <YOUR_REPOSITORY_LINK>
-   cd STT-FINAL
+   git clone https://github.com/santhoshkumaroff/STT-FINAL-STABLE.git
+   cd STT-FINAL-STABLE
    sudo docker-compose up --build --no-cache -d
 
    *Note: The first build takes 5-10 minutes because it downloads the
@@ -53,7 +53,7 @@ C) PORT 6379 ERROR (Redis):
    If the terminal says "Port 6379 already in use", stop your local Redis:
    sudo systemctl stop redis
 
-DE) EVALUATION 500 ERROR (Handshake rejected):
+D) EVALUATION 500 ERROR (Handshake rejected):
    By default, the system handles audio up to 10MB. If you get a 500 error 
    during evaluation, ensure you are not exceeding the browser's upload
    timeout. We recommend using 'localhost:8000' directly if you are 
