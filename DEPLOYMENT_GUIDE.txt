@@ -53,11 +53,17 @@ C) PORT 6379 ERROR (Redis):
    If the terminal says "Port 6379 already in use", stop your local Redis:
    sudo systemctl stop redis
 
+DE) EVALUATION 500 ERROR (Handshake rejected):
+   By default, the system handles audio up to 10MB. If you get a 500 error 
+   during evaluation, ensure you are not exceeding the browser's upload
+   timeout. We recommend using 'localhost:8000' directly if you are 
+   running into proxy limits on your Linux server.
+
 D) UNSTABLE INTERNET DURING BUILD:
    If the build fails during "download-model", simply run the build 
    command again. It will resume from the last successful file.
 
 =============================================================================
 Guide generated on: 2026-04-14
-Status: All Services Production-Ready (Verified Stable)
+Status: All Services Production-Ready (Verified Stable + Evaluation Patch)
 =============================================================================

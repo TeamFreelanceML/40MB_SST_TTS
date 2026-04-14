@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 
-const EVALUATION_API_BASE_URL = "/api/evaluation";
+// Use direct backend URL if provided (for large audio support), otherwise fallback to local proxy
+const EVALUATION_API_BASE_URL = process.env.NEXT_PUBLIC_EVALUATION_API_BASE_URL || "/api/evaluation";
 
 export interface EvaluationResult {
   [key: string]: unknown;
