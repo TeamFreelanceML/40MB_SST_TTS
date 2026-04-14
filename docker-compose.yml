@@ -66,10 +66,11 @@ services:
     networks:
       - readaloud-net
 
-  # --- TTS Admin Panel ---
   tts-admin:
     build:
       context: ./tts/admin-panel
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8001
     container_name: readaloud-tts-admin
     restart: unless-stopped
     ports:
