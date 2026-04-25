@@ -321,79 +321,124 @@ export function useSherpa(story: Story | null): SherpaHookResult {
   // Match results
   // -------------------------------------------------------------------------
 
-  const processResult = useCallback((text: string) => {
-    const curStory = storyRef.current;
-    if (!curStory || !text.trim() || statusRef.current !== "listening") return;
+  const tokenQueueRef = useRef<string[]>([]);
+  const isProcessingQueueRef = useRef(false);
 
-    // 1. Get tokens from the engine
-    const tokens = text.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
-    if (tokens.length === 0) return;
+  const processQueue = useCallback(async () => {
+    if (isProcessingQueueRef.current || tokenQueueRef.current.length === 0) return;
+    isProcessingQueueRef.current = true;
 
-    // 2. Local "Running Cursor" to handle multiple words in one result
-    let activeCursor = { ...cursorRef.current };
-    if (activeCursor.wordIndex === -1) return;
+    while (tokenQueueRef.current.length > 0) {
+        const token = tokenQueueRef.current.shift();
+        if (!token) break;
 
-    const recentTokens = tokens.slice(-5); // Process last 5 words heard
+        const curStory = storyRef.current;
+        if (!curStory) break;
 
-    for (const token of recentTokens) {
-      const targetWord = getWordAtCursor(curStory, activeCursor);
-      if (!targetWord) break;
+        let activeCursor = { ...cursorRef.current };
+        if (activeCursor.wordIndex === -1) break;
 
-      const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
+        const targetWord = getWordAtCursor(curStory, activeCursor);
+        if (!targetWord) break;
 
-      // RULE: Strict Exact Match
-      if (token === normalizedTarget) {
-        targetWord.status = "correct";
-        correctCountRef.current++;
-        setCorrectCount(correctCountRef.current);
+        const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
+        
+        const isExact = token === normalizedTarget;
+        const isFuzzy = normalizedTarget.length > 3 && levenshteinDistance(token, normalizedTarget) <= 1;
 
-        const next = advanceCursor(curStory, activeCursor);
-        if (next) {
-          const nextWord = getWordAtCursor(curStory, next);
-          if (nextWord) {
-            nextWord.status = "active";
-            activeCursor = next; // Update our local RUNNING cursor
-          }
-        } else {
-          activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-          setStatus("ready");
-          break;
-        }
-      } else {
-        // Check if user accidentally skipped ONE word (very short lookahead)
-        const nextPossible = advanceCursor(curStory, activeCursor);
-        if (nextPossible) {
-          const aheadWord = getWordAtCursor(curStory, nextPossible);
-          if (aheadWord && token === normalizeWord(aheadWord.text).toLowerCase()) {
-            targetWord.status = "skipped";
-            aheadWord.status = "correct";
+        if (isExact || isFuzzy) {
+            targetWord.status = "correct";
             correctCountRef.current++;
             setCorrectCount(correctCountRef.current);
 
-            const finalNext = advanceCursor(curStory, nextPossible);
-            if (finalNext) {
-              const finalNextWord = getWordAtCursor(curStory, finalNext);
-              if (finalNextWord) {
-                finalNextWord.status = "active";
-                activeCursor = finalNext; // Update local cursor
-              }
+            const next = advanceCursor(curStory, activeCursor);
+            if (next) {
+                const nextWord = getWordAtCursor(curStory, next);
+                if (nextWord) {
+                    nextWord.status = "active";
+                    activeCursor = next; 
+                }
             } else {
-              activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-              setStatus("ready");
-              break;
+                activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+                setStatus("ready");
             }
-          }
-        }
-      }
-    }
+            
+            // Sync React State
+            setCursor(activeCursor);
+            cursorRef.current = activeCursor;
 
-    // 3. Final Sync: Update React state and Ref once after the loop
-    if (activeCursor.paragraphIndex !== cursorRef.current.paragraphIndex ||
-      activeCursor.wordIndex !== cursorRef.current.wordIndex) {
-      setCursor(activeCursor);
-      cursorRef.current = activeCursor;
+            // PREMUM FLOW: Wait 60ms between words so the eye can follow the glow
+            await new Promise(r => setTimeout(r, 60));
+        } else {
+            // [V5.6 SMART LOOKAHEAD]
+            let lookaheadCursor: ReadingCursor | null = { ...activeCursor };
+            let foundMatch = false;
+
+            for (let j = 0; j < 5; j++) {
+                const nextCandidate = advanceCursor(curStory, lookaheadCursor as ReadingCursor);
+                if (!nextCandidate) break;
+                lookaheadCursor = nextCandidate;
+
+                const aheadWord = getWordAtCursor(curStory, lookaheadCursor);
+                if (!aheadWord) break;
+
+                const normAhead = normalizeWord(aheadWord.text).toLowerCase();
+                if (token === normAhead || (normAhead.length > 3 && levenshteinDistance(token, normAhead) <= 1)) {
+                    // Match found! Marks all intermediate words as skipped.
+                    let skipSweep: ReadingCursor | null = { ...activeCursor };
+                    while (skipSweep && (skipSweep.wordIndex !== lookaheadCursor.wordIndex || skipSweep.sentenceIndex !== lookaheadCursor.sentenceIndex)) {
+                        const skipWord = getWordAtCursor(curStory, skipSweep);
+                        if (skipWord) skipWord.status = "skipped";
+                        const nextSweep: ReadingCursor | null = advanceCursor(curStory, skipSweep);
+                        if (!nextSweep) break;
+                        skipSweep = nextSweep;
+                    }
+
+                    aheadWord.status = "correct";
+                    correctCountRef.current++;
+                    setCorrectCount(correctCountRef.current);
+
+                    const finalNext = advanceCursor(curStory, lookaheadCursor);
+                    if (finalNext) {
+                        const finalNextWord = getWordAtCursor(curStory, finalNext);
+                        if (finalNextWord) {
+                            finalNextWord.status = "active";
+                            activeCursor = finalNext; 
+                        }
+                    } else {
+                      activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+                      setStatus("ready");
+                    }
+                    
+                    setCursor(activeCursor);
+                    cursorRef.current = activeCursor;
+                    await new Promise(r => setTimeout(r, 60));
+                    foundMatch = true;
+                    break;
+                }
+            }
+            if (foundMatch) continue;
+        }
     }
-  }, []);
+    isProcessingQueueRef.current = false;
+  }, [setCursor, setCorrectCount]);
+
+  const processResult = useCallback((text: string) => {
+    if (statusRef.current !== "listening") return;
+    const tokens = text.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
+    if (tokens.length === 0) return;
+
+    // Push only NEW tokens into the queue
+    // We look at the last 3 tokens from the engine and add any we haven't processed yet.
+    const lastThree = tokens.slice(-3);
+    for (const t of lastThree) {
+        if (!tokenQueueRef.current.includes(t)) {
+            tokenQueueRef.current.push(t);
+        }
+    }
+    
+    processQueue();
+  }, [processQueue]);
 
   // -------------------------------------------------------------------------
   // Progressive Reset

@@ -79,14 +79,14 @@ function getChunkStyles(isActive: boolean): React.CSSProperties {
 export default function BlurGate({ story, cursor }: BlurGateProps) {
   const content = useMemo(() => {
     return story.paragraphs.map((paragraph, pIdx) => {
-      const paragraphStyle = getParagraphStyles(getParagraphDistance(pIdx, cursor));
+      const distance = getParagraphDistance(pIdx, cursor);
+      const isParaActive = distance === 0;
 
       return (
         <div
           key={paragraph.id}
-          className="paragraph-block mb-8 leading-relaxed"
+          className={`paragraph-block ${isParaActive ? 'paragraph-active' : 'paragraph-inactive'}`}
           id={`paragraph-${pIdx}`}
-          style={paragraphStyle}
         >
           {paragraph.sentences.map((sentence, sIdx) => (
             <span key={sentence.id} className="sentence-span">

@@ -111,7 +111,24 @@ body {
 }
 
 .paragraph-block {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: blur(0px);
+  opacity: 1;
+}
+
+/* Blur Gate: Fade out non-active paragraphs */
+.paragraph-inactive {
+  filter: blur(2px);
+  opacity: 0.35;
+  pointer-events: none;
+  transform: scale(0.98);
+}
+
+.paragraph-active {
+  filter: blur(0px);
+  opacity: 1;
+  transform: scale(1);
 }
 
 /* -------------------------------------------------------------------------
@@ -128,22 +145,26 @@ body {
 /* Active word — the word the reader should say next */
 .word-active {
   color: var(--accent-amber);
-  font-weight: 600;
-  text-shadow: 0 0 12px var(--accent-amber-glow);
-  animation: pulse-glow 1.5s ease-in-out infinite;
+  font-weight: 700;
+  text-shadow: 
+    0 0 15px var(--accent-amber-glow),
+    0 0 30px rgba(99, 102, 241, 0.2); /* Subtle indigo secondary glow */
+  animation: pulse-glow 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   position: relative;
+  z-index: 10;
 }
 
 .word-active::after {
   content: "";
   position: absolute;
-  bottom: -2px;
+  bottom: -4px;
   left: 0;
   right: 0;
-  height: 3px;
-  background: var(--accent-amber);
-  border-radius: 2px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent-amber), #6366f1);
+  border-radius: 4px;
   animation: underline-slide 1.5s ease-in-out infinite;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
 }
 
 /* Correctly read word */
