@@ -36,6 +36,13 @@ docker compose up --build
 - **Benefits**: Runs locally in the student's browser. This ensures **zero network latency** during reading, protecting the experience even on unstable Wi-Fi.
 - **Assets**: Uses a Zipformer-based transducer model (`encoder`, `decoder`, `joiner`) and a `tokens.txt` vocabulary.
 
+### **⚡ Adaptive Optimization (Smart AI Engine)**
+The frontend dynamically adapts to the student's hardware for a lag-free experience:
+- **Pro Mode (194MB)**: Automatically loaded on Desktop/PC with 4+ CPU cores for maximum precision.
+- **Eco Mode (35MB)**: Automatically loaded on Mobiles, Tablets, and Low-Spec PCs to prevent memory crashes and UI lag.
+- **Persistent Caching**: Uses `IndexedDB` to store neural assets locally. After the first visit, the AI engine loads instantly with zero data usage.
+- **Audio Resampling**: Enforces strict 16kHz resampling to stabilize recognition on lower-end mobile microphones.
+
 ### **Backend Models (Server-Side Inference)**
 - **STT Evaluation**: `OpenAI Whisper (base)`. 
   - **Purpose**: High-fidelity session transcription for final accuracy and fluency scoring (WCPM).
