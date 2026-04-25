@@ -36,7 +36,7 @@ The platform is standardized on a high-performance **35MB Zipformer-Small Engine
 - **Universal Compatibility**: Optimized for low-spec Mobiles, Tablets, and School Laptops (tested for 100% stability).
 - **High-Tolerance Highlighting**: Uses a calibrated **Distance-2 Fuzzy Matching** algorithm to ensure students remain engaged and encouraged.
 - **Persistent Caching**: Uses `IndexedDB` to store models locally. Subsequent loads are instant with zero data usage.
-- **Resampling Guard**: Forces strict 16kHz audio normalization to ensure accuracy on low-end microphones.
+- **verified Production Links**: Uses the official `epoch-99` neural brain and the **k2-fsa Public Space** runtime. This version is hardened against 404/401 errors and is **100% publicly fetchable** during Docker builds (Cache-v4 Verified).
 
 ### **Backend Models (Server-Side Inference)**
 - **STT Evaluation**: `OpenAI Whisper (base)`. 
