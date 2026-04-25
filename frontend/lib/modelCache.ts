@@ -2,7 +2,7 @@ import { openDB, IDBPDatabase } from 'idb';
 
 const DB_NAME = 'SherpaModelCache';
 const STORE_NAME = 'models';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /**
  * ModelCache provides a persistent storage for large WASM/ONNX assets using IndexedDB.
