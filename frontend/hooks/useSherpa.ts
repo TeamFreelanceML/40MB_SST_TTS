@@ -325,60 +325,70 @@ export function useSherpa(story: Story | null): SherpaHookResult {
     const curStory = storyRef.current;
     if (!curStory || !text.trim()) return;
 
-    // 1. Process recent tokens (last 3 words to allow for corrections)
+    // 1. Get tokens from the engine
     const tokens = text.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
     if (tokens.length === 0) return;
 
-    const curCursor = { ...cursorRef.current };
-    if (curCursor.wordIndex === -1) return;
-
-    // 2. Multi-word Match Loop (Smoothing)
-    // We try to match as many tokens as possible from the end of the recognized text
-    const recentTokens = tokens.slice(-8); 
+    // 2. Strict Sequential Matcher
+    // We only try to match the CURRENT word or the NEXT word (for speed).
+    // This totally prevents jumping to the 3rd or 4th sentence.
+    const recentTokens = tokens.slice(-5); // Look at the last 5 words heard
 
     for (const token of recentTokens) {
-        let scanCursor: ReadingCursor | null = { ...cursorRef.current };
-        let matchedSomething = false;
+        const curCursor = { ...cursorRef.current };
+        if (curCursor.wordIndex === -1) break;
 
-        // 3. 2-Chunk Fence: Restrict lookahead
-        // We scan ahead up to 12 words to allow for fast reading speed
-        for (let i = 0; i < 12; i++) {
-            if (!scanCursor) break;
-            const targetWord = getWordAtCursor(curStory, scanCursor);
-            if (!targetWord) break;
+        const targetWord = getWordAtCursor(curStory, curCursor);
+        if (!targetWord) break;
 
-            // Only match if word is not already correct
-            if (targetWord.status !== "correct") {
-                const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
-                const isExact = token === normalizedTarget;
-                const isFuzzy = normalizedTarget.length > 3 && levenshteinDistance(token, normalizedTarget) <= 1;
+        const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
+        
+        // RULE: Strict Exact Match (No Skipping)
+        if (token === normalizedTarget) {
+            targetWord.status = "correct";
+            correctCountRef.current++;
+            setCorrectCount(correctCountRef.current);
 
-                if (isExact || isFuzzy) {
-                    targetWord.status = "correct";
+            const next = advanceCursor(curStory, curCursor);
+            if (next) {
+                const nextWord = getWordAtCursor(curStory, next);
+                if (nextWord) {
+                    nextWord.status = "active";
+                    setCursor(next);
+                    cursorRef.current = next;
+                }
+            } else {
+                setCursor({ paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 });
+                setStatus("ready");
+                break;
+            }
+        } else {
+            // Check if user accidentally skipped ONE word (very short lookahead)
+            const nextPossible = advanceCursor(curStory, curCursor);
+            if (nextPossible) {
+                const aheadWord = getWordAtCursor(curStory, nextPossible);
+                if (aheadWord && token === normalizeWord(aheadWord.text).toLowerCase()) {
+                    // Match found 1 word ahead - allow the skip but keep it sequential
+                    targetWord.status = "skipped";
+                    aheadWord.status = "correct";
                     correctCountRef.current++;
                     setCorrectCount(correctCountRef.current);
 
-                    const next = advanceCursor(curStory, scanCursor);
-                    if (next) {
-                        const nextWord = getWordAtCursor(curStory, next);
-                        if (nextWord) {
-                            nextWord.status = "active";
-                            setCursor(next);
-                            cursorRef.current = next;
+                    const finalNext = advanceCursor(curStory, nextPossible);
+                    if (finalNext) {
+                        const finalNextWord = getWordAtCursor(curStory, finalNext);
+                        if (finalNextWord) {
+                            finalNextWord.status = "active";
+                            setCursor(finalNext);
+                            cursorRef.current = finalNext;
                         }
                     } else {
-                        setCursor({ paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 });
-                        setStatus("ready");
+                      setCursor({ paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 });
+                      setStatus("ready");
+                      break;
                     }
-                    matchedSomething = true;
-                    break;
                 }
             }
-            scanCursor = advanceCursor(curStory, scanCursor);
-        }
-        // If we matched something, we check the next token against the NEW cursor
-        if (!matchedSomething) {
-            // Optional: Handle stuttering/repeats by staying at current cursor
         }
     }
   }, []);
