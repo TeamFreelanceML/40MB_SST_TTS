@@ -139,11 +139,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
 
   // Sync refs with state
   useEffect(() => { 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    // Detect low-spec desktops (less than 4 logical cores)
-    const isLowSpec = (navigator.hardwareConcurrency || 4) < 4;
-    
-    isMobileRef.current = isMobile || isLowSpec;
+    // Global Standard: Use Lightweight Small Model (35MB) for maximum speed
     cursorRef.current = cursor; 
   }, [cursor]);
   useEffect(() => { storyRef.current = story; }, [story]);
@@ -179,26 +175,17 @@ export function useSherpa(story: Story | null): SherpaHookResult {
       setStatus("loading");
       setStatusMessage("Loading Neural Engine...");
 
-      // Intelligence: Use small model if Mobile OR Low-Spec PC
-      const useSmallModel = isMobileRef.current;
-      const modelBasePath = useSmallModel ? "/sherpa-onnx-small" : "/sherpa-onnx";
-      
+      const modelBasePath = "/sherpa-onnx-small";
       const assetMap: Record<string, string> = {};
-      const assets = useSmallModel ? [
+      const assets = [
         { key: "tokens", file: "tokens.txt" },
         { key: "encoder", file: "encoder.onnx" },
         { key: "decoder", file: "decoder.onnx" },
         { key: "joiner", file: "joiner.onnx" },
-        // We still need the standard runtime blobs even for the small model
+        // Runtime scripts stay in the main folder for stability
         { key: "api", file: "sherpa-onnx.js", path: "/sherpa-onnx" },
         { key: "glue", file: "sherpa-onnx-wasm-main-asr.js", path: "/sherpa-onnx" },
         { key: "wasm", file: "sherpa-onnx-wasm-main-asr.wasm", path: "/sherpa-onnx" }
-      ] : [
-        { key: "wasm", file: "sherpa-onnx-wasm-main-asr.wasm" },
-        { key: "data", file: "sherpa-onnx-wasm-main-asr.data" },
-        { key: "api", file: "sherpa-onnx.js" },
-        { key: "glue", file: "sherpa-onnx-wasm-main-asr.js" },
-        { key: "tokens", file: "tokens.txt" }
       ];
 
       (async () => {
@@ -223,57 +210,29 @@ export function useSherpa(story: Story | null): SherpaHookResult {
           const moduleConfig: SherpaModule = {
             locateFile: (path: string) => {
               if (assetMap[path]) return assetMap[path];
-              // Fallback for names that Emscripten might try (like .wasm)
               if (path.endsWith(".wasm") && assetMap["sherpa-onnx-wasm-main-asr.wasm"]) return assetMap["sherpa-onnx-wasm-main-asr.wasm"];
-              return `${WASM_BASE_PATH}/${path}`;
+              return `/sherpa-onnx/${path}`;
             },
             setStatus: (text: string) => {
               if (!text) setStatusMessage("Neural Engine active");
               else setStatusMessage(text);
             },
             onRuntimeInitialized: () => {
-              console.log("[useSherpa] WASM Runtime Initialized");
+              console.log("[useSherpa] WASM Runtime Initialized (Small Engine)");
               try {
-                // If using SMALL model (for mobile or low-spec laptop), write to FS
-                if (useSmallModel) {
-                    (async () => {
-                        const encoderBytes = await modelCache.getBytes("encoder.onnx");
-                        const decoderBytes = await modelCache.getBytes("decoder.onnx");
-                        const joinerBytes = await modelCache.getBytes("joiner.onnx");
-                        const tokensBytes = await modelCache.getBytes("tokens.txt");
+                (async () => {
+                    const [encoderBytes, decoderBytes, joinerBytes, tokensBytes] = await Promise.all([
+                        modelCache.getBytes("encoder.onnx"),
+                        modelCache.getBytes("decoder.onnx"),
+                        modelCache.getBytes("joiner.onnx"),
+                        modelCache.getBytes("tokens.txt")
+                    ]);
 
-                        if (encoderBytes) win.Module.FS.writeFile("encoder.onnx", encoderBytes);
-                        if (decoderBytes) win.Module.FS.writeFile("decoder.onnx", decoderBytes);
-                        if (joinerBytes) win.Module.FS.writeFile("joiner.onnx", joinerBytes);
-                        if (tokensBytes) win.Module.FS.writeFile("tokens.txt", tokensBytes);
+                    if (encoderBytes) win.Module.FS.writeFile("encoder.onnx", encoderBytes);
+                    if (decoderBytes) win.Module.FS.writeFile("decoder.onnx", decoderBytes);
+                    if (joinerBytes) win.Module.FS.writeFile("joiner.onnx", joinerBytes);
+                    if (tokensBytes) win.Module.FS.writeFile("tokens.txt", tokensBytes);
 
-                        const config = {
-                          featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
-                          modelConfig: {
-                            transducer: {
-                              encoder: "./encoder.onnx",
-                              decoder: "./decoder.onnx",
-                              joiner: "./joiner.onnx",
-                            },
-                            tokens: "./tokens.txt",
-                            modelType: "zipformer",
-                          },
-                          // VAD Optimization for Mobile
-                          endpointConfig: {
-                            rule1: { keepMaxFrames: 240, minUtteranceLength: 0.0, minSilenceTokenCount: 12 }, // ~2.4s silence rule
-                            rule2: { keepMaxFrames: 120, minUtteranceLength: 0.0, minSilenceTokenCount: 8 },  // ~1.2s silence rule
-                            rule3: { keepMaxFrames: 20, minUtteranceLength: 0.0, minSilenceTokenCount: 4 }     // Immediate end
-                          }
-                        };
-
-                        const recognizer = window.createOnlineRecognizer(window.Module, config);
-                        recognizerRef.current = recognizer;
-                        setStatus("ready");
-                        setStatusMessage("Ready — Click Start to begin reading");
-                        resolve();
-                    })();
-                } else {
-                    // Standard Large Model Path
                     const config = {
                       featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
                       modelConfig: {
@@ -282,16 +241,22 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                           decoder: "./decoder.onnx",
                           joiner: "./joiner.onnx",
                         },
-                        tokens: assetMap["tokens.txt"] || "./tokens.txt",
+                        tokens: "./tokens.txt",
                         modelType: "zipformer",
                       },
+                      endpointConfig: {
+                        rule1: { keepMaxFrames: 240, minUtteranceLength: 0.0, minSilenceTokenCount: 12 },
+                        rule2: { keepMaxFrames: 120, minUtteranceLength: 0.0, minSilenceTokenCount: 8 },
+                        rule3: { keepMaxFrames: 20, minUtteranceLength: 0.0, minSilenceTokenCount: 4 }
+                      }
                     };
+
                     const recognizer = window.createOnlineRecognizer(window.Module, config);
                     recognizerRef.current = recognizer;
                     setStatus("ready");
                     setStatusMessage("Ready — Click Start to begin reading");
                     resolve();
-                }
+                })();
               } catch (err) {
                 setStatus("error");
                 setStatusMessage(`ASR Initializer Failed: ${formatInitError(err)}`);
@@ -350,15 +315,13 @@ export function useSherpa(story: Story | null): SherpaHookResult {
     let matchedPos: { cursor: ReadingCursor; word: Word } | null = null;
     let scanCursor: ReadingCursor | null = { ...curCursor };
 
-    const useSmallModel = isMobileRef.current;
-    
-    for (let i = 0; i < (useSmallModel ? 8 : 5); i++) {
+    for (let i = 0; i < 8; i++) {
         if (!scanCursor) break;
         const targetWord = getWordAtCursor(curStory, scanCursor);
         if (!targetWord) break;
 
         const isExact = lastToken === targetWord.text;
-        const fuzzyThreshold = useSmallModel ? 2 : 1;
+        const fuzzyThreshold = 2; // Fixed high-tolerance for quantized models
         const isFuzzy = targetWord.text.length > 2 && levenshteinDistance(lastToken, targetWord.text) <= fuzzyThreshold;
 
         if (isExact || isFuzzy) {

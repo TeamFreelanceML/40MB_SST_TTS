@@ -20,7 +20,7 @@ COPY . .
 RUN test -d app/api/evaluation/evaluate && test -d app/results || (echo "CRITICAL: app directory sync failed" && exit 1)
 
 RUN npm run download-model \
-    && test -s public/sherpa-onnx/sherpa-onnx-wasm-main-asr.data \
+    && test -s public/sherpa-onnx/sherpa-onnx-wasm-main-asr.wasm \
     && test -s public/sherpa-onnx-small/encoder.onnx \
     && test -s public/sherpa-onnx-small/tokens.txt
 

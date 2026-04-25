@@ -31,17 +31,12 @@ docker compose up --build
 ## 🧠 Model Architecture
 
 ### **Frontend Models (Local Browser Inference)**
-- **Engine**: `Sherpa-ONNX` (WASM Runtime).
-- **Purpose**: Real-time word tracking and highlighting.
-- **Benefits**: Runs locally in the student's browser. This ensures **zero network latency** during reading, protecting the experience even on unstable Wi-Fi.
-- **Assets**: Uses a Zipformer-based transducer model (`encoder`, `decoder`, `joiner`) and a `tokens.txt` vocabulary.
-
-### **⚡ Adaptive Optimization (Smart AI Engine)**
-The frontend dynamically adapts to the student's hardware for a lag-free experience:
-- **Pro Mode (194MB)**: Automatically loaded on Desktop/PC with 4+ CPU cores for maximum precision.
-- **Eco Mode (35MB)**: Automatically loaded on Mobiles, Tablets, and Low-Spec PCs to prevent memory crashes and UI lag.
+### **⚡ Global Lightweight AI Engine**
+The platform is standardized on a performance-first **35MB Zipformer-Small Engine** across all devices (Desktop, Mobile, and Tablet):
+- **Universal Speed**: Sub-100ms latency on any hardware, from high-spec PCs to budget school tablets.
 - **Persistent Caching**: Uses `IndexedDB` to store neural assets locally. After the first visit, the AI engine loads instantly with zero data usage.
-- **Audio Resampling**: Enforces strict 16kHz resampling to stabilize recognition on lower-end mobile microphones.
+- **Audio Precision**: Enforces strict 16kHz resampling and **Level 2 Fuzzy Matching** to maintain high recognition accuracy on quantized models.
+- **Zero-Baud Deployment**: Build-time automated model fetching reduces the final Docker image size and minimizes bandwidth usage.
 
 ### **Backend Models (Server-Side Inference)**
 - **STT Evaluation**: `OpenAI Whisper (base)`. 
