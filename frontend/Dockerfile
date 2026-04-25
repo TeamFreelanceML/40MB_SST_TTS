@@ -1,4 +1,4 @@
-# --- BUILD CACHE BREAKER: 2026-04-24-v3 ---
+# --- BUILD CACHE BREAKER: 2026-04-25-v4 ---
 FROM node:20-alpine
 
 WORKDIR /app
