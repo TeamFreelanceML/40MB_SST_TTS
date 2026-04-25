@@ -493,12 +493,17 @@ export function useSherpa(story: Story | null): SherpaHookResult {
       streamRef.current = stream;
 
       processor.onaudioprocess = (e) => {
-        if (statusRef.current !== "listening") return;
+        if (statusRef.current !== "listening" || !recognizerRef.current) return;
         const inputData = e.inputBuffer.getChannelData(0);
-        stream.acceptWaveform(SAMPLE_RATE, inputData);
         
-        while (recognizerRef.current?.isReady?.(stream) ?? true) {
-          recognizerRef.current?.decode?.(stream);
+        // [V5.1 CRITICAL FIX] Use the ACTUAL Context Sample Rate
+        // Some browsers ignore the 16000 request and use 48000. 
+        // We must tell the engine exactly what rate the buffer is currently at.
+        const actualSampleRate = audioCtx.sampleRate;
+        stream.acceptWaveform(actualSampleRate, inputData);
+        
+        while (recognizerRef.current.isReady(stream)) {
+          recognizerRef.current.decode(stream);
         }
 
         const result = recognizerRef.current?.getResult(stream);
