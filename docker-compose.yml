@@ -53,7 +53,7 @@ services:
       - PORT=8001
     volumes:
       - tts_audio_cache:/app/audio_cache
-      - tts_weights:/app/weights
+      - ./tts/engines:/app/engines
     depends_on:
       redis:
         condition: service_healthy

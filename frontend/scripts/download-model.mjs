@@ -79,25 +79,25 @@ function downloadFile(url, dest) {
   ensureDir(SMALL_MODEL_DIR);
 
   const models = [
-    // 35MB Neural Models (Zipformer-Small)
+    // 35MB Neural Models (Streaming Zipformer-20M)
     { 
       name: "Encoder", 
-      url: "https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26/resolve/main/encoder-epoch-99-avg-1.int8.onnx", 
+      url: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17/resolve/main/encoder-epoch-99-avg-1.int8.onnx", 
       dest: path.join(SMALL_MODEL_DIR, "encoder.onnx") 
     },
     { 
       name: "Decoder", 
-      url: "https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26/resolve/main/decoder-epoch-99-avg-1.int8.onnx", 
+      url: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17/resolve/main/decoder-epoch-99-avg-1.int8.onnx", 
       dest: path.join(SMALL_MODEL_DIR, "decoder.onnx") 
     },
     { 
       name: "Joiner", 
-      url: "https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26/resolve/main/joiner-epoch-99-avg-1.int8.onnx", 
+      url: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17/resolve/main/joiner-epoch-99-avg-1.int8.onnx", 
       dest: path.join(SMALL_MODEL_DIR, "joiner.onnx") 
     },
     { 
       name: "Tokens", 
-      url: "https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26/resolve/main/tokens.txt", 
+      url: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17/resolve/main/tokens.txt", 
       dest: path.join(SMALL_MODEL_DIR, "tokens.txt") 
     },
 

@@ -183,14 +183,14 @@ export function useSherpa(story: Story | null): SherpaHookResult {
           assetMap["sherpa-onnx-wasm-main-asr.data"] = URL.createObjectURL(dummyDataBlob);
 
           const assets = [
-            { key: "tokens", file: "tokens.txt" },
-            { key: "encoder", file: "encoder.onnx" },
-            { key: "decoder", file: "decoder.onnx" },
-            { key: "joiner", file: "joiner.onnx" },
+            { key: "tokens", file: "tokens.txt", cacheKey: "tokens.v5.txt" },
+            { key: "encoder", file: "encoder.onnx", cacheKey: "encoder.v5.onnx" },
+            { key: "decoder", file: "decoder.onnx", cacheKey: "decoder.v5.onnx" },
+            { key: "joiner", file: "joiner.onnx", cacheKey: "joiner.v5.onnx" },
             // Runtime scripts stay in the main folder for stability
-            { key: "api", file: "sherpa-onnx.js", path: "/sherpa-onnx" },
-            { key: "glue", file: "sherpa-onnx-wasm-main-asr.js", path: "/sherpa-onnx" },
-            { key: "wasm", file: "sherpa-onnx-wasm-main-asr.wasm", path: "/sherpa-onnx" }
+            { key: "api", file: "sherpa-onnx.js", path: "/sherpa-onnx", cacheKey: "api.v5.js" },
+            { key: "glue", file: "sherpa-onnx-wasm-main-asr.js", path: "/sherpa-onnx", cacheKey: "glue.v5.js" },
+            { key: "wasm", file: "sherpa-onnx-wasm-main-asr.wasm", path: "/sherpa-onnx", cacheKey: "wasm.v5.wasm" }
           ];
 
       (async () => {
@@ -200,7 +200,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
             const base = asset.path || modelBasePath;
             const blobUrl = await modelCache.getFile(
               `${base}/${asset.file}`,
-              asset.file,
+              asset.cacheKey,
               (pct) => {
                 const totalProgress = Math.round((loadedCount * 100 + pct) / assets.length);
                 setDownloadProgress(totalProgress);
@@ -233,10 +233,10 @@ export function useSherpa(story: Story | null): SherpaHookResult {
               try {
                 (async () => {
                     const [encoderBytes, decoderBytes, joinerBytes, tokensBytes] = await Promise.all([
-                        modelCache.getBytes("encoder.onnx"),
-                        modelCache.getBytes("decoder.onnx"),
-                        modelCache.getBytes("joiner.onnx"),
-                        modelCache.getBytes("tokens.txt")
+                        modelCache.getBytes("encoder.v5.onnx"),
+                        modelCache.getBytes("decoder.v5.onnx"),
+                        modelCache.getBytes("joiner.v5.onnx"),
+                        modelCache.getBytes("tokens.v5.txt")
                     ]);
 
                     // [V4.5 FIX] Hardened FS Detection
