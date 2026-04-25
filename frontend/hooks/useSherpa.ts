@@ -129,7 +129,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const rawMediaStreamRef = useRef<MediaStream | null>(null);
-  
+
   const cursorRef = useRef<ReadingCursor>(cursor);
   const storyRef = useRef<Story | null>(story);
   const correctCountRef = useRef<number>(0);
@@ -138,9 +138,9 @@ export function useSherpa(story: Story | null): SherpaHookResult {
   const isMobileRef = useRef(false);
 
   // Sync refs with state
-  useEffect(() => { 
+  useEffect(() => {
     // Global Standard: Use Lightweight Small Model (35MB) for maximum speed
-    cursorRef.current = cursor; 
+    cursorRef.current = cursor;
   }, [cursor]);
   useEffect(() => { storyRef.current = story; }, [story]);
   useEffect(() => { statusRef.current = status; }, [status]);
@@ -160,7 +160,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
       if (document.querySelector('script[src*="sherpa-onnx.js"]')) {
         console.log("[useSherpa] WASM Scripts already present. Skipping injection.");
         if (typeof window.createOnlineRecognizer === "function") {
-           setStatus("ready");
+          setStatus("ready");
         }
         resolve();
         return;
@@ -175,23 +175,23 @@ export function useSherpa(story: Story | null): SherpaHookResult {
       setStatus("loading");
       setStatusMessage("Loading Neural Engine...");
 
-          const modelBasePath = "/sherpa-onnx-small";
-          const assetMap: Record<string, string> = {};
-          
-          // [V4.4 FIX] Create a 1-byte mock blob to satisfy the .data dependency check
-          const dummyDataBlob = new Blob([new Uint8Array(1)], { type: 'application/octet-stream' });
-          assetMap["sherpa-onnx-wasm-main-asr.data"] = URL.createObjectURL(dummyDataBlob);
+      const modelBasePath = "/sherpa-onnx-small";
+      const assetMap: Record<string, string> = {};
 
-          const assets = [
-            { key: "tokens", file: "tokens.txt", cacheKey: "tokens.v5.txt" },
-            { key: "encoder", file: "encoder.onnx", cacheKey: "encoder.v5.onnx" },
-            { key: "decoder", file: "decoder.onnx", cacheKey: "decoder.v5.onnx" },
-            { key: "joiner", file: "joiner.onnx", cacheKey: "joiner.v5.onnx" },
-            // Runtime scripts stay in the main folder for stability
-            { key: "api", file: "sherpa-onnx.js", path: "/sherpa-onnx", cacheKey: "api.v5.js" },
-            { key: "glue", file: "sherpa-onnx-wasm-main-asr.js", path: "/sherpa-onnx", cacheKey: "glue.v5.js" },
-            { key: "wasm", file: "sherpa-onnx-wasm-main-asr.wasm", path: "/sherpa-onnx", cacheKey: "wasm.v5.wasm" }
-          ];
+      // [V4.4 FIX] Create a 1-byte mock blob to satisfy the .data dependency check
+      const dummyDataBlob = new Blob([new Uint8Array(1)], { type: 'application/octet-stream' });
+      assetMap["sherpa-onnx-wasm-main-asr.data"] = URL.createObjectURL(dummyDataBlob);
+
+      const assets = [
+        { key: "tokens", file: "tokens.txt", cacheKey: "tokens.v5.txt" },
+        { key: "encoder", file: "encoder.onnx", cacheKey: "encoder.v5.onnx" },
+        { key: "decoder", file: "decoder.onnx", cacheKey: "decoder.v5.onnx" },
+        { key: "joiner", file: "joiner.onnx", cacheKey: "joiner.v5.onnx" },
+        // Runtime scripts stay in the main folder for stability
+        { key: "api", file: "sherpa-onnx.js", path: "/sherpa-onnx", cacheKey: "api.v5.js" },
+        { key: "glue", file: "sherpa-onnx-wasm-main-asr.js", path: "/sherpa-onnx", cacheKey: "glue.v5.js" },
+        { key: "wasm", file: "sherpa-onnx-wasm-main-asr.wasm", path: "/sherpa-onnx", cacheKey: "wasm.v5.wasm" }
+      ];
 
       (async () => {
         try {
@@ -225,56 +225,56 @@ export function useSherpa(story: Story | null): SherpaHookResult {
               else setStatusMessage(text);
             },
             monitorRunDependencies: (left: number) => {
-               // Ignore dependencies like the .data file
-               if (left === 0) console.log("[useSherpa] Engine dependencies resolved.");
+              // Ignore dependencies like the .data file
+              if (left === 0) console.log("[useSherpa] Engine dependencies resolved.");
             },
             onRuntimeInitialized: function run() {
               console.log("[useSherpa] WASM Runtime Initialized (Small Engine)");
               try {
                 (async () => {
-                    const [encoderBytes, decoderBytes, joinerBytes, tokensBytes] = await Promise.all([
-                        modelCache.getBytes("encoder.v5.onnx"),
-                        modelCache.getBytes("decoder.v5.onnx"),
-                        modelCache.getBytes("joiner.v5.onnx"),
-                        modelCache.getBytes("tokens.v5.txt")
-                    ]);
+                  const [encoderBytes, decoderBytes, joinerBytes, tokensBytes] = await Promise.all([
+                    modelCache.getBytes("encoder.v5.onnx"),
+                    modelCache.getBytes("decoder.v5.onnx"),
+                    modelCache.getBytes("joiner.v5.onnx"),
+                    modelCache.getBytes("tokens.v5.txt")
+                  ]);
 
-                    // [V4.5 FIX] Hardened FS Detection
-                    const fs = win.Module.FS || win.FS || (window as any).FS;
-                    if (!fs) {
-                        console.error("[useSherpa] CRITICAL: Emscripten FS not found. Retrying in 100ms...");
-                        setTimeout(() => run(), 100);
-                        return;
-                    }
+                  // [V4.5 FIX] Hardened FS Detection
+                  const fs = win.Module.FS || win.FS || (window as any).FS;
+                  if (!fs) {
+                    console.error("[useSherpa] CRITICAL: Emscripten FS not found. Retrying in 100ms...");
+                    setTimeout(() => run(), 100);
+                    return;
+                  }
 
-                    if (encoderBytes) fs.writeFile("encoder.onnx", encoderBytes);
-                    if (decoderBytes) fs.writeFile("decoder.onnx", decoderBytes);
-                    if (joinerBytes) fs.writeFile("joiner.onnx", joinerBytes);
-                    if (tokensBytes) fs.writeFile("tokens.txt", tokensBytes);
+                  if (encoderBytes) fs.writeFile("encoder.onnx", encoderBytes);
+                  if (decoderBytes) fs.writeFile("decoder.onnx", decoderBytes);
+                  if (joinerBytes) fs.writeFile("joiner.onnx", joinerBytes);
+                  if (tokensBytes) fs.writeFile("tokens.txt", tokensBytes);
 
-                    const config = {
-                      featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
-                      modelConfig: {
-                        transducer: {
-                          encoder: "./encoder.onnx",
-                          decoder: "./decoder.onnx",
-                          joiner: "./joiner.onnx",
-                        },
-                        tokens: "./tokens.txt",
-                        modelType: "zipformer",
+                  const config = {
+                    featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
+                    modelConfig: {
+                      transducer: {
+                        encoder: "./encoder.onnx",
+                        decoder: "./decoder.onnx",
+                        joiner: "./joiner.onnx",
                       },
-                      endpointConfig: {
-                        rule1: { keepMaxFrames: 240, minUtteranceLength: 0.0, minSilenceTokenCount: 12 },
-                        rule2: { keepMaxFrames: 120, minUtteranceLength: 0.0, minSilenceTokenCount: 8 },
-                        rule3: { keepMaxFrames: 20, minUtteranceLength: 0.0, minSilenceTokenCount: 4 }
-                      }
-                    };
+                      tokens: "./tokens.txt",
+                      modelType: "zipformer",
+                    },
+                    endpointConfig: {
+                      rule1: { keepMaxFrames: 240, minUtteranceLength: 0.0, minSilenceTokenCount: 12 },
+                      rule2: { keepMaxFrames: 120, minUtteranceLength: 0.0, minSilenceTokenCount: 8 },
+                      rule3: { keepMaxFrames: 20, minUtteranceLength: 0.0, minSilenceTokenCount: 4 }
+                    }
+                  };
 
-                    const recognizer = window.createOnlineRecognizer(window.Module, config);
-                    recognizerRef.current = recognizer;
-                    setStatus("ready");
-                    setStatusMessage("Ready — Click Start to begin reading");
-                    resolve();
+                  const recognizer = window.createOnlineRecognizer(window.Module, config);
+                  recognizerRef.current = recognizer;
+                  setStatus("ready");
+                  setStatusMessage("Ready — Click Start to begin reading");
+                  resolve();
                 })();
               } catch (err) {
                 setStatus("error");
@@ -313,7 +313,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
   useEffect(() => {
     if (!hasInitialized && typeof window !== "undefined") {
       setHasInitialized(true);
-      loadWasmModule().catch(() => {});
+      loadWasmModule().catch(() => { });
     }
   }, [hasInitialized, loadWasmModule]);
 
@@ -336,62 +336,62 @@ export function useSherpa(story: Story | null): SherpaHookResult {
     const recentTokens = tokens.slice(-5); // Process last 5 words heard
 
     for (const token of recentTokens) {
-        const targetWord = getWordAtCursor(curStory, activeCursor);
-        if (!targetWord) break;
+      const targetWord = getWordAtCursor(curStory, activeCursor);
+      if (!targetWord) break;
 
-        const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
-        
-        // RULE: Strict Exact Match
-        if (token === normalizedTarget) {
-            targetWord.status = "correct";
+      const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
+
+      // RULE: Strict Exact Match
+      if (token === normalizedTarget) {
+        targetWord.status = "correct";
+        correctCountRef.current++;
+        setCorrectCount(correctCountRef.current);
+
+        const next = advanceCursor(curStory, activeCursor);
+        if (next) {
+          const nextWord = getWordAtCursor(curStory, next);
+          if (nextWord) {
+            nextWord.status = "active";
+            activeCursor = next; // Update our local RUNNING cursor
+          }
+        } else {
+          activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+          setStatus("ready");
+          break;
+        }
+      } else {
+        // Check if user accidentally skipped ONE word (very short lookahead)
+        const nextPossible = advanceCursor(curStory, activeCursor);
+        if (nextPossible) {
+          const aheadWord = getWordAtCursor(curStory, nextPossible);
+          if (aheadWord && token === normalizeWord(aheadWord.text).toLowerCase()) {
+            targetWord.status = "skipped";
+            aheadWord.status = "correct";
             correctCountRef.current++;
             setCorrectCount(correctCountRef.current);
 
-            const next = advanceCursor(curStory, activeCursor);
-            if (next) {
-                const nextWord = getWordAtCursor(curStory, next);
-                if (nextWord) {
-                    nextWord.status = "active";
-                    activeCursor = next; // Update our local RUNNING cursor
-                }
+            const finalNext = advanceCursor(curStory, nextPossible);
+            if (finalNext) {
+              const finalNextWord = getWordAtCursor(curStory, finalNext);
+              if (finalNextWord) {
+                finalNextWord.status = "active";
+                activeCursor = finalNext; // Update local cursor
+              }
             } else {
-                activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-                setStatus("ready");
-                break;
+              activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+              setStatus("ready");
+              break;
             }
-        } else {
-            // Check if user accidentally skipped ONE word (very short lookahead)
-            const nextPossible = advanceCursor(curStory, activeCursor);
-            if (nextPossible) {
-                const aheadWord = getWordAtCursor(curStory, nextPossible);
-                if (aheadWord && token === normalizeWord(aheadWord.text).toLowerCase()) {
-                    targetWord.status = "skipped";
-                    aheadWord.status = "correct";
-                    correctCountRef.current++;
-                    setCorrectCount(correctCountRef.current);
-
-                    const finalNext = advanceCursor(curStory, nextPossible);
-                    if (finalNext) {
-                        const finalNextWord = getWordAtCursor(curStory, finalNext);
-                        if (finalNextWord) {
-                            finalNextWord.status = "active";
-                            activeCursor = finalNext; // Update local cursor
-                        }
-                    } else {
-                      activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-                      setStatus("ready");
-                      break;
-                    }
-                }
-            }
+          }
         }
+      }
     }
 
     // 3. Final Sync: Update React state and Ref once after the loop
-    if (activeCursor.paragraphIndex !== cursorRef.current.paragraphIndex || 
-        activeCursor.wordIndex !== cursorRef.current.wordIndex) {
-        setCursor(activeCursor);
-        cursorRef.current = activeCursor;
+    if (activeCursor.paragraphIndex !== cursorRef.current.paragraphIndex ||
+      activeCursor.wordIndex !== cursorRef.current.wordIndex) {
+      setCursor(activeCursor);
+      cursorRef.current = activeCursor;
     }
   }, []);
 
@@ -474,8 +474,8 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         rawMediaStreamRef.current = existingStream;
       } else {
         console.log("[useSherpa] Requesting new microphone access...");
-        rawMediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ 
-          audio: { channelCount: 1, sampleRate: SAMPLE_RATE, echoCancellation: true } 
+        rawMediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, sampleRate: SAMPLE_RATE, echoCancellation: true }
         });
       }
 
@@ -485,23 +485,23 @@ export function useSherpa(story: Story | null): SherpaHookResult {
 
       const source = audioCtx.createMediaStreamSource(rawMediaStreamRef.current);
       const processor = audioCtx.createScriptProcessor(1024, 1, 1);
-      
+
       source.connect(processor);
       processor.connect(audioCtx.destination);
-      
+
       const stream = recognizerRef.current.createStream();
       streamRef.current = stream;
 
       processor.onaudioprocess = (e) => {
         if (statusRef.current !== "listening" || !recognizerRef.current) return;
         const inputData = e.inputBuffer.getChannelData(0);
-        
+
         // [V5.1 CRITICAL FIX] Use the ACTUAL Context Sample Rate
         // Some browsers ignore the 16000 request and use 48000. 
         // We must tell the engine exactly what rate the buffer is currently at.
         const actualSampleRate = audioCtx.sampleRate;
         stream.acceptWaveform(actualSampleRate, inputData);
-        
+
         while (recognizerRef.current.isReady(stream)) {
           recognizerRef.current.decode(stream);
         }
@@ -528,12 +528,12 @@ export function useSherpa(story: Story | null): SherpaHookResult {
       processorRef.current.onaudioprocess = null;
       processorRef.current.disconnect();
     }
-    if (audioCtxRef.current) audioCtxRef.current.close().catch(() => {});
-    
+    if (audioCtxRef.current) audioCtxRef.current.close().catch(() => { });
+
     // Only stop tracks if WE created the stream (not if shared)
     // Actually in this app UI, we stop everything at once.
     if (rawMediaStreamRef.current) {
-        rawMediaStreamRef.current.getTracks().forEach(t => t.stop());
+      rawMediaStreamRef.current.getTracks().forEach(t => t.stop());
     }
 
     if (streamRef.current) {
