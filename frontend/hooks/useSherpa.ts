@@ -545,20 +545,36 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         rawMediaStreamRef.current = existingStream;
       } else {
         console.log("[useSherpa] Requesting new microphone access...");
-        rawMediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
-          audio: { channelCount: 1, sampleRate: SAMPLE_RATE, echoCancellation: true }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 1,
+            sampleRate: 16000,
+          },
         });
+        rawMediaStreamRef.current = stream;
       }
 
       // Initialize Audio processing at 16kHz for Sherpa
-      const audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
-      audioCtxRef.current = audioCtx;
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        sampleRate: 16000, // Lock to 16kHz for Sherpa-ONNX
+      });
+      audioCtxRef.current = audioContext;
 
-      const source = audioCtx.createMediaStreamSource(rawMediaStreamRef.current);
-      const processor = audioCtx.createScriptProcessor(1024, 1, 1);
+      const source = audioContext.createMediaStreamSource(rawMediaStreamRef.current);
+      
+      // 2. Add a High-Pass Filter to remove low-frequency background hum
+      const filter = audioContext.createBiquadFilter();
+      filter.type = "highpass";
+      filter.frequency.value = 200; // Cut everything below 200Hz (AC hum, traffic, etc)
 
-      source.connect(processor);
-      processor.connect(audioCtx.destination);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      source.connect(filter);
+      filter.connect(processor);
+      processor.connect(audioContext.destination);
 
       const stream = recognizerRef.current.createStream();
       streamRef.current = stream;
@@ -570,7 +586,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         // [V5.1 CRITICAL FIX] Use the ACTUAL Context Sample Rate
         // Some browsers ignore the 16000 request and use 48000. 
         // We must tell the engine exactly what rate the buffer is currently at.
-        const actualSampleRate = audioCtx.sampleRate;
+        const actualSampleRate = audioContext.sampleRate;
         stream.acceptWaveform(actualSampleRate, inputData);
 
         while (recognizerRef.current.isReady(stream)) {
