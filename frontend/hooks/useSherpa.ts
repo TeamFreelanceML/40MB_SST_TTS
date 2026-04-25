@@ -334,15 +334,15 @@ export function useSherpa(story: Story | null): SherpaHookResult {
 
     // 2. Multi-word Match Loop (Smoothing)
     // We try to match as many tokens as possible from the end of the recognized text
-    const recentTokens = tokens.slice(-4); 
+    const recentTokens = tokens.slice(-8); 
 
     for (const token of recentTokens) {
         let scanCursor: ReadingCursor | null = { ...cursorRef.current };
         let matchedSomething = false;
 
         // 3. 2-Chunk Fence: Restrict lookahead
-        // We only scan ahead up to 10 words (roughly 1.5 chunks) to prevent jumps
-        for (let i = 0; i < 10; i++) {
+        // We scan ahead up to 12 words to allow for fast reading speed
+        for (let i = 0; i < 12; i++) {
             if (!scanCursor) break;
             const targetWord = getWordAtCursor(curStory, scanCursor);
             if (!targetWord) break;
@@ -472,7 +472,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
       audioCtxRef.current = audioCtx;
 
       const source = audioCtx.createMediaStreamSource(rawMediaStreamRef.current);
-      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      const processor = audioCtx.createScriptProcessor(1024, 1, 1);
       
       source.connect(processor);
       processor.connect(audioCtx.destination);
