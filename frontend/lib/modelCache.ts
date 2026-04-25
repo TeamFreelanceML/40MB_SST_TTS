@@ -37,7 +37,8 @@ export class ModelCache {
 
     if (cached) {
       console.log(`[ModelCache] Cache hit for ${name}`);
-      return URL.createObjectURL(new Blob([cached]));
+      const blob = name.endsWith('.wasm') ? new Blob([cached], { type: 'application/wasm' }) : new Blob([cached]);
+      return URL.createObjectURL(blob);
     }
 
     console.log(`[ModelCache] Cache miss for ${name}. Downloading...`);
@@ -70,7 +71,8 @@ export class ModelCache {
 
     await database.put(STORE_NAME, allChunks, name);
     console.log(`[ModelCache] Cached ${name} (${receivedLength} bytes)`);
-    return URL.createObjectURL(new Blob([allChunks]));
+    const blob = name.endsWith('.wasm') ? new Blob([allChunks], { type: 'application/wasm' }) : new Blob([allChunks]);
+    return URL.createObjectURL(blob);
   }
 
   /**

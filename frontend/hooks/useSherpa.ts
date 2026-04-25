@@ -175,18 +175,23 @@ export function useSherpa(story: Story | null): SherpaHookResult {
       setStatus("loading");
       setStatusMessage("Loading Neural Engine...");
 
-      const modelBasePath = "/sherpa-onnx-small";
-      const assetMap: Record<string, string> = {};
-      const assets = [
-        { key: "tokens", file: "tokens.txt" },
-        { key: "encoder", file: "encoder.onnx" },
-        { key: "decoder", file: "decoder.onnx" },
-        { key: "joiner", file: "joiner.onnx" },
-        // Runtime scripts stay in the main folder for stability
-        { key: "api", file: "sherpa-onnx.js", path: "/sherpa-onnx" },
-        { key: "glue", file: "sherpa-onnx-wasm-main-asr.js", path: "/sherpa-onnx" },
-        { key: "wasm", file: "sherpa-onnx-wasm-main-asr.wasm", path: "/sherpa-onnx" }
-      ];
+          const modelBasePath = "/sherpa-onnx-small";
+          const assetMap: Record<string, string> = {};
+          
+          // [V4.4 FIX] Create a 1-byte mock blob to satisfy the .data dependency check
+          const dummyDataBlob = new Blob([new Uint8Array(1)], { type: 'application/octet-stream' });
+          assetMap["sherpa-onnx-wasm-main-asr.data"] = URL.createObjectURL(dummyDataBlob);
+
+          const assets = [
+            { key: "tokens", file: "tokens.txt" },
+            { key: "encoder", file: "encoder.onnx" },
+            { key: "decoder", file: "decoder.onnx" },
+            { key: "joiner", file: "joiner.onnx" },
+            // Runtime scripts stay in the main folder for stability
+            { key: "api", file: "sherpa-onnx.js", path: "/sherpa-onnx" },
+            { key: "glue", file: "sherpa-onnx-wasm-main-asr.js", path: "/sherpa-onnx" },
+            { key: "wasm", file: "sherpa-onnx-wasm-main-asr.wasm", path: "/sherpa-onnx" }
+          ];
 
       (async () => {
         try {
@@ -210,8 +215,8 @@ export function useSherpa(story: Story | null): SherpaHookResult {
           const moduleConfig: SherpaModule = {
             noInitialRun: true, // [V4.1 FIX] Prevent searching for missing .data file
             locateFile: (path: string) => {
-              if (path.endsWith(".data")) return ""; // Ignore requests for the big data file
               if (assetMap[path]) return assetMap[path];
+              if (path.endsWith(".data")) return assetMap["sherpa-onnx-wasm-main-asr.data"];
               if (path.endsWith(".wasm") && assetMap["sherpa-onnx-wasm-main-asr.wasm"]) return assetMap["sherpa-onnx-wasm-main-asr.wasm"];
               return `/sherpa-onnx/${path}`;
             },
@@ -273,13 +278,12 @@ export function useSherpa(story: Story | null): SherpaHookResult {
 
           window.Module = moduleConfig;
 
-          // Injected pre-cached scripts with cache-busting for Brave/Chrome
-          const cacheBuster = "?v=4.1";
+          // Injected pre-cached scripts
           const apiScript = document.createElement("script");
-          apiScript.src = assetMap["sherpa-onnx.js"] + cacheBuster;
+          apiScript.src = assetMap["sherpa-onnx.js"];
           apiScript.onload = () => {
             const glueScript = document.createElement("script");
-            glueScript.src = assetMap["sherpa-onnx-wasm-main-asr.js"] + cacheBuster;
+            glueScript.src = assetMap["sherpa-onnx-wasm-main-asr.js"];
             glueScript.onerror = () => {
               setStatus("error");
               setStatusMessage("Failed to load binary glue");
