@@ -343,8 +343,12 @@ export function useSherpa(story: Story | null): SherpaHookResult {
 
         const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
         
+        // --- BALANCED TOLERANCE LOGIC ---
+        // Allow 1 mistake for all words >= 2 letters. 
+        // This is the "Sweet Spot" for high-accuracy reading coaches.
+        const distance = levenshteinDistance(token, normalizedTarget);
         const isExact = token === normalizedTarget;
-        const isFuzzy = normalizedTarget.length > 3 && levenshteinDistance(token, normalizedTarget) <= 1;
+        const isFuzzy = normalizedTarget.length >= 2 && distance <= 1;
 
         if (isExact || isFuzzy) {
             targetWord.status = "correct";
@@ -363,14 +367,11 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 setStatus("ready");
             }
             
-            // Sync React State
             setCursor(activeCursor);
             cursorRef.current = activeCursor;
-
-            // PREMUM FLOW: Wait 60ms between words so the eye can follow the glow
             await new Promise(r => setTimeout(r, 60));
         } else {
-            // [V5.6 SMART LOOKAHEAD]
+            // [V5.8 BALANCED LOOKAHEAD]
             let lookaheadCursor: ReadingCursor | null = { ...activeCursor };
             let foundMatch = false;
 
@@ -383,7 +384,10 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 if (!aheadWord) break;
 
                 const normAhead = normalizeWord(aheadWord.text).toLowerCase();
-                if (token === normAhead || (normAhead.length > 3 && levenshteinDistance(token, normAhead) <= 1)) {
+                const distAhead = levenshteinDistance(token, normAhead);
+                
+                // Use the same Balanced Tolerance for lookahead
+                if (token === normAhead || (normAhead.length >= 2 && distAhead <= 1)) {
                     // Match found! Marks all intermediate words as skipped.
                     let skipSweep: ReadingCursor | null = { ...activeCursor };
                     while (skipSweep && (skipSweep.wordIndex !== lookaheadCursor.wordIndex || skipSweep.sentenceIndex !== lookaheadCursor.sentenceIndex)) {
