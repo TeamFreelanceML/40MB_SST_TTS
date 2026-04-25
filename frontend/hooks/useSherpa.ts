@@ -228,7 +228,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                // Ignore dependencies like the .data file
                if (left === 0) console.log("[useSherpa] Engine dependencies resolved.");
             },
-            onRuntimeInitialized: () => {
+            onRuntimeInitialized: function run() {
               console.log("[useSherpa] WASM Runtime Initialized (Small Engine)");
               try {
                 (async () => {
@@ -239,10 +239,18 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                         modelCache.getBytes("tokens.txt")
                     ]);
 
-                    if (encoderBytes) win.Module.FS.writeFile("encoder.onnx", encoderBytes);
-                    if (decoderBytes) win.Module.FS.writeFile("decoder.onnx", decoderBytes);
-                    if (joinerBytes) win.Module.FS.writeFile("joiner.onnx", joinerBytes);
-                    if (tokensBytes) win.Module.FS.writeFile("tokens.txt", tokensBytes);
+                    // [V4.5 FIX] Hardened FS Detection
+                    const fs = win.Module.FS || win.FS || (window as any).FS;
+                    if (!fs) {
+                        console.error("[useSherpa] CRITICAL: Emscripten FS not found. Retrying in 100ms...");
+                        setTimeout(() => run(), 100);
+                        return;
+                    }
+
+                    if (encoderBytes) fs.writeFile("encoder.onnx", encoderBytes);
+                    if (decoderBytes) fs.writeFile("decoder.onnx", decoderBytes);
+                    if (joinerBytes) fs.writeFile("joiner.onnx", joinerBytes);
+                    if (tokensBytes) fs.writeFile("tokens.txt", tokensBytes);
 
                     const config = {
                       featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
