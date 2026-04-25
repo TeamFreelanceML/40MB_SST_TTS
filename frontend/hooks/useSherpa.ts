@@ -423,22 +423,36 @@ export function useSherpa(story: Story | null): SherpaHookResult {
     isProcessingQueueRef.current = false;
   }, [setCursor, setCorrectCount]);
 
+  const lastProcessedTokenCountRef = useRef(0);
+
   const processResult = useCallback((text: string) => {
     if (statusRef.current !== "listening") return;
-    const tokens = text.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
-    if (tokens.length === 0) return;
-
-    // Push only NEW tokens into the queue
-    // We look at the last 3 tokens from the engine and add any we haven't processed yet.
-    const lastThree = tokens.slice(-3);
-    for (const t of lastThree) {
-        if (!tokenQueueRef.current.includes(t)) {
-            tokenQueueRef.current.push(t);
-        }
-    }
     
-    processQueue();
+    // 1. Get ALL current tokens from the engine's cumulative result
+    const allTokens = text.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
+    if (allTokens.length === 0) {
+        lastProcessedTokenCountRef.current = 0;
+        return;
+    }
+
+    // 2. Identify only the NEW tokens that haven't been queued yet
+    // Example: If we already queued 2 words ("It", "is") and now we have 3 ("It", "is", "a"),
+    // we only queue the 3rd word ("a").
+    if (allTokens.length > lastProcessedTokenCountRef.current) {
+        const newTokens = allTokens.slice(lastProcessedTokenCountRef.current);
+        tokenQueueRef.current.push(...newTokens);
+        lastProcessedTokenCountRef.current = allTokens.length;
+        processQueue();
+    }
   }, [processQueue]);
+
+  // Reset the count when the student stops or starts
+  useEffect(() => {
+    if (status === "ready") {
+        lastProcessedTokenCountRef.current = 0;
+        tokenQueueRef.current = [];
+    }
+  }, [status]);
 
   // -------------------------------------------------------------------------
   // Progressive Reset
