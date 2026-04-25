@@ -177,12 +177,10 @@ body {
   text-decoration-thickness: 2px;
 }
 
-/* Skipped word (Phase 2 — TTS rescue) */
+/* Skipped word — Now unified with correct color to stay positive */
 .word-skipped {
-  color: var(--accent-rose);
-  opacity: 0.7;
-  text-decoration-line: line-through;
-  text-decoration-color: rgba(244, 63, 94, 0.5);
+  color: var(--accent-emerald);
+  opacity: 0.8;
 }
 
 /* Wrong word */
