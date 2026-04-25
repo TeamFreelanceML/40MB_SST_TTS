@@ -28,7 +28,8 @@ async function downloadFile(url, dest, retries = 3) {
       await new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
         const request = (currentUrl) => {
-          https.get(currentUrl, {
+          const req = https.get(currentUrl, {
+            timeout: 30000, // 30 second timeout
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
               'Accept': '*/*',
@@ -61,7 +62,14 @@ async function downloadFile(url, dest, retries = 3) {
               process.stdout.write("\n");
               resolve();
             });
-          }).on("error", (err) => {
+          });
+
+          req.on("timeout", () => {
+            req.destroy();
+            reject(new Error("Request timed out (30s)"));
+          });
+
+          req.on("error", (err) => {
             fs.unlink(dest, () => {});
             reject(err);
           });
