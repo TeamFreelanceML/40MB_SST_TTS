@@ -375,7 +375,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
             let lookaheadCursor: ReadingCursor | null = { ...activeCursor };
             let foundMatch = false;
 
-            for (let j = 0; j < 5; j++) {
+            for (let j = 0; j < 3; j++) {
                 const nextCandidate = advanceCursor(curStory, lookaheadCursor as ReadingCursor);
                 if (!nextCandidate) break;
                 lookaheadCursor = nextCandidate;
@@ -427,25 +427,33 @@ export function useSherpa(story: Story | null): SherpaHookResult {
     isProcessingQueueRef.current = false;
   }, [setCursor, setCorrectCount]);
 
-  const lastProcessedTokenCountRef = useRef(0);
+  const lastMatchedIndexRef = useRef(-1);
 
   const processResult = useCallback((text: string) => {
     if (statusRef.current !== "listening") return;
     
-    // 1. Get ALL current tokens from the engine's cumulative result
     const allTokens = text.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
     if (allTokens.length === 0) {
-        lastProcessedTokenCountRef.current = 0;
+        lastMatchedIndexRef.current = -1;
         return;
     }
 
-    // 2. Identify only the NEW tokens that haven't been queued yet
-    // Example: If we already queued 2 words ("It", "is") and now we have 3 ("It", "is", "a"),
-    // we only queue the 3rd word ("a").
-    if (allTokens.length > lastProcessedTokenCountRef.current) {
-        const newTokens = allTokens.slice(lastProcessedTokenCountRef.current);
-        tokenQueueRef.current.push(...newTokens);
-        lastProcessedTokenCountRef.current = allTokens.length;
+    // FRONTIER-SEARCH: We only look at words that appear AFTER our last successful match
+    // in the current speech result. This is immune to the "Say it Twice" correction bug.
+    const searchFrom = lastMatchedIndexRef.current + 1;
+    
+    // We only look at the "Leading Edge" (the last 3 words) to prevent random chatter 
+    // from matching words we haven't read yet.
+    const frontier = allTokens.slice(Math.max(searchFrom, allTokens.length - 3));
+
+    if (frontier.length > 0) {
+        // Find the FIRST word in the frontier that hasn't been queued
+        // To be safe, we just push the frontier words into the queue
+        // and let the sequencer handle them one by one.
+        tokenQueueRef.current.push(...frontier);
+        
+        // Update the marker so we don't process these specific words again
+        lastMatchedIndexRef.current = allTokens.length - 1;
         processQueue();
     }
   }, [processQueue]);
@@ -453,7 +461,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
   // Reset the count when the student stops or starts
   useEffect(() => {
     if (status === "ready") {
-        lastProcessedTokenCountRef.current = 0;
+        lastMatchedIndexRef.current = -1;
         tokenQueueRef.current = [];
     }
   }, [status]);
