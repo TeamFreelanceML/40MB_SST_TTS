@@ -208,7 +208,9 @@ export function useSherpa(story: Story | null): SherpaHookResult {
 
           const win = window as any;
           const moduleConfig: SherpaModule = {
+            noInitialRun: true, // [V4.1 FIX] Prevent searching for missing .data file
             locateFile: (path: string) => {
+              if (path.endsWith(".data")) return ""; // Ignore requests for the big data file
               if (assetMap[path]) return assetMap[path];
               if (path.endsWith(".wasm") && assetMap["sherpa-onnx-wasm-main-asr.wasm"]) return assetMap["sherpa-onnx-wasm-main-asr.wasm"];
               return `/sherpa-onnx/${path}`;
@@ -216,6 +218,10 @@ export function useSherpa(story: Story | null): SherpaHookResult {
             setStatus: (text: string) => {
               if (!text) setStatusMessage("Neural Engine active");
               else setStatusMessage(text);
+            },
+            monitorRunDependencies: (left: number) => {
+               // Ignore dependencies like the .data file
+               if (left === 0) console.log("[useSherpa] Engine dependencies resolved.");
             },
             onRuntimeInitialized: () => {
               console.log("[useSherpa] WASM Runtime Initialized (Small Engine)");
@@ -267,12 +273,13 @@ export function useSherpa(story: Story | null): SherpaHookResult {
 
           window.Module = moduleConfig;
 
-          // Injected pre-cached scripts
+          // Injected pre-cached scripts with cache-busting for Brave/Chrome
+          const cacheBuster = "?v=4.1";
           const apiScript = document.createElement("script");
-          apiScript.src = assetMap["sherpa-onnx.js"];
+          apiScript.src = assetMap["sherpa-onnx.js"] + cacheBuster;
           apiScript.onload = () => {
             const glueScript = document.createElement("script");
-            glueScript.src = assetMap["sherpa-onnx-wasm-main-asr.js"];
+            glueScript.src = assetMap["sherpa-onnx-wasm-main-asr.js"] + cacheBuster;
             glueScript.onerror = () => {
               setStatus("error");
               setStatusMessage("Failed to load binary glue");
