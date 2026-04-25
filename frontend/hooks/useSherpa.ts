@@ -325,46 +325,61 @@ export function useSherpa(story: Story | null): SherpaHookResult {
     const curStory = storyRef.current;
     if (!curStory || !text.trim()) return;
 
-    const tokens = text.trim().split(/\s+/).map(t => normalizeWord(t)).filter(t => t.length > 0);
+    // 1. Process recent tokens (last 3 words to allow for corrections)
+    const tokens = text.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
     if (tokens.length === 0) return;
 
-    const lastToken = tokens[tokens.length - 1];
-    const curCursor = cursorRef.current;
+    const curCursor = { ...cursorRef.current };
+    if (curCursor.wordIndex === -1) return;
 
-    let matchedPos: { cursor: ReadingCursor; word: Word } | null = null;
-    let scanCursor: ReadingCursor | null = { ...curCursor };
+    // 2. Multi-word Match Loop (Smoothing)
+    // We try to match as many tokens as possible from the end of the recognized text
+    const recentTokens = tokens.slice(-4); 
 
-    for (let i = 0; i < 8; i++) {
-        if (!scanCursor) break;
-        const targetWord = getWordAtCursor(curStory, scanCursor);
-        if (!targetWord) break;
+    for (const token of recentTokens) {
+        let scanCursor: ReadingCursor | null = { ...cursorRef.current };
+        let matchedSomething = false;
 
-        const isExact = lastToken === targetWord.text;
-        const fuzzyThreshold = 2; // Fixed high-tolerance for quantized models
-        const isFuzzy = targetWord.text.length > 2 && levenshteinDistance(lastToken, targetWord.text) <= fuzzyThreshold;
+        // 3. 2-Chunk Fence: Restrict lookahead
+        // We only scan ahead up to 10 words (roughly 1.5 chunks) to prevent jumps
+        for (let i = 0; i < 10; i++) {
+            if (!scanCursor) break;
+            const targetWord = getWordAtCursor(curStory, scanCursor);
+            if (!targetWord) break;
 
-        if (isExact || isFuzzy) {
-          matchedPos = { cursor: { ...scanCursor }, word: targetWord };
-          break;
+            // Only match if word is not already correct
+            if (targetWord.status !== "correct") {
+                const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
+                const isExact = token === normalizedTarget;
+                const isFuzzy = normalizedTarget.length > 3 && levenshteinDistance(token, normalizedTarget) <= 1;
+
+                if (isExact || isFuzzy) {
+                    targetWord.status = "correct";
+                    correctCountRef.current++;
+                    setCorrectCount(correctCountRef.current);
+
+                    const next = advanceCursor(curStory, scanCursor);
+                    if (next) {
+                        const nextWord = getWordAtCursor(curStory, next);
+                        if (nextWord) {
+                            nextWord.status = "active";
+                            setCursor(next);
+                            cursorRef.current = next;
+                        }
+                    } else {
+                        setCursor({ paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 });
+                        setStatus("ready");
+                    }
+                    matchedSomething = true;
+                    break;
+                }
+            }
+            scanCursor = advanceCursor(curStory, scanCursor);
         }
-        scanCursor = advanceCursor(curStory, scanCursor);
-    }
-
-    if (matchedPos) {
-      matchedPos.word.status = "correct";
-      correctCountRef.current++;
-      setCorrectCount(correctCountRef.current);
-
-      const next = advanceCursor(curStory, matchedPos.cursor);
-      if (next) {
-        const nextWord = getWordAtCursor(curStory, next);
-        if (nextWord) nextWord.status = "active";
-        setCursor(next);
-        cursorRef.current = next;
-      } else {
-        setCursor({ paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 });
-        setStatus("ready"); 
-      }
+        // If we matched something, we check the next token against the NEW cursor
+        if (!matchedSomething) {
+            // Optional: Handle stuttering/repeats by staying at current cursor
+        }
     }
   }, []);
 

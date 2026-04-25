@@ -22,51 +22,60 @@ function ensureDir(dir) {
   }
 }
 
-function downloadFile(url, dest) {
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest);
-    const request = (currentUrl) => {
-      https.get(currentUrl, {
-        headers: {
-            // [CRITICAL FIX] Pretend to be a Google Chrome browser. 
-            // If we omit this, HuggingFace LFS blocks the download with a 401 error.
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-        }
-      }, (response) => {
-        if ([301, 302, 307, 308].includes(response.statusCode)) {
-          const location = response.headers.location;
-          if (location) { request(new URL(location, currentUrl).href); return; }
-        }
-        if (response.statusCode !== 200) {
-          reject(new Error(`HTTP ${response.statusCode} for ${currentUrl}`));
-          return;
-        }
+async function downloadFile(url, dest, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(dest);
+        const request = (currentUrl) => {
+          https.get(currentUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              'Accept': '*/*',
+              'Referer': 'https://huggingface.co/'
+            }
+          }, (response) => {
+            if ([301, 302, 307, 308].includes(response.statusCode)) {
+              const location = response.headers.location;
+              if (location) { request(new URL(location, currentUrl).href); return; }
+            }
+            if (response.statusCode !== 200) {
+              reject(new Error(`HTTP ${response.statusCode} for ${currentUrl}`));
+              return;
+            }
 
-        const contentLength = parseInt(response.headers["content-length"] || "0", 10);
-        let downloaded = 0;
+            const contentLength = parseInt(response.headers["content-length"] || "0", 10);
+            let downloaded = 0;
 
-        response.on("data", (chunk) => {
-          downloaded += chunk.length;
-          if (contentLength > 0) {
-            const pct = ((downloaded / contentLength) * 100).toFixed(1);
-            process.stdout.write(`\rDownloading ${path.basename(dest)}: ${pct}%`);
-          }
-        });
+            response.on("data", (chunk) => {
+              downloaded += chunk.length;
+              if (contentLength > 0) {
+                const pct = ((downloaded / contentLength) * 100).toFixed(1);
+                process.stdout.write(`\rDownloading ${path.basename(dest)}: ${pct}%`);
+              }
+            });
 
-        response.pipe(file);
-        file.on("finish", () => {
-          file.close();
-          process.stdout.write("\n");
-          resolve();
-        });
-      }).on("error", (err) => {
-        fs.unlink(dest, () => {});
-        reject(err);
+            response.pipe(file);
+            file.on("finish", () => {
+              file.close();
+              process.stdout.write("\n");
+              resolve();
+            });
+          }).on("error", (err) => {
+            fs.unlink(dest, () => {});
+            reject(err);
+          });
+        };
+        request(url);
       });
-    };
-    request(url);
-  });
+      return;
+    } catch (error) {
+      console.error(`\n[RETRY ${i + 1}/${retries}] Failed to download ${path.basename(dest)}: ${error.message}`);
+      if (fs.existsSync(dest)) fs.unlinkSync(dest);
+      if (i === retries - 1) throw error;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
 }
 
 (async () => {
