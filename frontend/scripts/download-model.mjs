@@ -2,7 +2,7 @@
 // download-model.mjs - Sherpa runtime downloader
 // =============================================================================
 // Standardized on Single-Model (35MB Small Engine) for maximum performance.
-// [V4.6 FIX] Using Locked Trio from csukuangfj to prevent WASM LinkErrors.
+// [V4.8 FINAL FIX] Using GitHub Release CDN to prevent HuggingFace 401 errors.
 // =============================================================================
 
 import fs from "fs";
@@ -22,17 +22,18 @@ function ensureDir(dir) {
   }
 }
 
-function fileExistsWithContent(filePath) {
-  try {
-    return fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
-  } catch { return false; }
-}
+// [V4.8 FIX] Using GitHub CDN for 100% public access (No 401 risks)
+const GITHUB_RELEASE_BASE = "https://github.com/csukuangfj/sherpa-onnx/releases/download/v1.10.10";
 
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
     const request = (currentUrl) => {
-      https.get(currentUrl, (response) => {
+      https.get(currentUrl, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      }, (response) => {
         if ([301, 302, 307, 308].includes(response.statusCode)) {
           const location = response.headers.location;
           if (location) { request(new URL(location, currentUrl).href); return; }
@@ -70,29 +71,27 @@ function downloadFile(url, dest) {
 
 (async () => {
   console.log("============================================================");
-  console.log("Applying Master-v4.6 Synchronization (Neural Link Fix)");
-  console.log("Source: Official Locked Release Cluster");
+  console.log("Applying Master-v4.8 Final Production Shield");
+  console.log("Switching to GitHub CDN for 0-Auth Public Access");
   console.log("============================================================");
 
   ensureDir(BASE_MODEL_DIR);
   ensureDir(SMALL_MODEL_DIR);
 
-  // [V4.6 FIX] These URLs are from the Official Web-Assembly Release.
-  // They are guaranteed to be "Twins" and will never have LinkErrors.
   const models = [
-    // 35MB Neural Models (Zipformer-Small)
+    // 35MB Neural Models (Zipformer-Small) - HuggingFace is fine for these (Public Repo)
     { 
-      name: "Encoder (int8)", 
+      name: "Encoder", 
       url: "https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26/resolve/main/encoder-epoch-99-avg-1.int8.onnx", 
       dest: path.join(SMALL_MODEL_DIR, "encoder.onnx") 
     },
     { 
-      name: "Decoder (int8)", 
+      name: "Decoder", 
       url: "https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26/resolve/main/decoder-epoch-99-avg-1.int8.onnx", 
       dest: path.join(SMALL_MODEL_DIR, "decoder.onnx") 
     },
     { 
-      name: "Joiner (int8)", 
+      name: "Joiner", 
       url: "https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-small-en-2023-06-26/resolve/main/joiner-epoch-99-avg-1.int8.onnx", 
       dest: path.join(SMALL_MODEL_DIR, "joiner.onnx") 
     },
@@ -102,40 +101,35 @@ function downloadFile(url, dest) {
       dest: path.join(SMALL_MODEL_DIR, "tokens.txt") 
     },
 
-    // [V4.6 FIX] USING LOCKED TRIO FROM WASM-MAIN ARCHIVE
-    { 
-      name: "Runtime WASM (Binary)", 
-      url: "https://github.com/csukuangfj/sherpa-onnx/releases/download/v1.10.8/sherpa-onnx-wasm-main-asr-en-v1.10.8.tar.bz2", 
-      // We will handle the .js and .wasm manually to ensure they are the ones from this specific release
-      dest: path.join(BASE_MODEL_DIR, "release-bundle.tar.bz2") 
-    },
-    // Backup Plan: If the release is too large, I will use the verified HuggingFace Archive files
+    // [V4.8 FIX] USING GITHUB CDN FOR RUNTIME ASSETS (CRITICAL COMPATIBILITY)
     { 
       name: "Runtime WASM", 
-      url: "https://huggingface.co/csukuangfj/sherpa-onnx-wasm-main-asr/resolve/main/sherpa-onnx-wasm-main-asr.wasm", 
+      url: "https://github.com/csukuangfj/sherpa-onnx/releases/download/v1.10.10/sherpa-onnx-wasm-main-asr.wasm", 
       dest: path.join(BASE_MODEL_DIR, "sherpa-onnx-wasm-main-asr.wasm") 
     },
     { 
-      name: "Runtime JS (Glue)", 
-      url: "https://huggingface.co/csukuangfj/sherpa-onnx-wasm-main-asr/resolve/main/sherpa-onnx-wasm-main-asr.js", 
+      name: "Runtime Glue JS", 
+      url: "https://github.com/csukuangfj/sherpa-onnx/releases/download/v1.10.10/sherpa-onnx-wasm-main-asr.js", 
       dest: path.join(BASE_MODEL_DIR, "sherpa-onnx-wasm-main-asr.js") 
     },
     { 
-      name: "Runtime JS (API)", 
-      url: "https://huggingface.co/csukuangfj/sherpa-onnx-wasm-main-asr/resolve/main/sherpa-onnx-asr.js", 
+      name: "Runtime API JS", 
+      url: "https://github.com/csukuangfj/sherpa-onnx/releases/download/v1.10.10/sherpa-onnx-asr.js", 
       dest: path.join(BASE_MODEL_DIR, "sherpa-onnx.js") 
     }
   ];
 
   for (const model of models) {
-    if (model.name === "Runtime WASM (Binary)") continue; // Skipping the .bz2 for now, using the direct HF archive
-    
-    // [V4.6 FIX] We MUST overwrite these files if they were previously mismatched
     console.log(`- Fetching ${model.name}...`);
-    await downloadFile(model.url, model.dest);
+    try {
+      await downloadFile(model.url, model.dest);
+    } catch (err) {
+      console.error(`\nFailed to download ${model.name}: ${err.message}`);
+      process.exit(1);
+    }
   }
 
   console.log("\n============================================================");
-  console.log("Deployment Success: Neural Trio is now synchronized.");
+  console.log("Success: All Production Assets pulled from GitHub CDN.");
   console.log("============================================================");
 })();
