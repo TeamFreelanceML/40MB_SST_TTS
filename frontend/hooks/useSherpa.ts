@@ -129,6 +129,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const rawMediaStreamRef = useRef<MediaStream | null>(null);
+  const lastMatchedIndexRef = useRef(-1);
 
   const cursorRef = useRef<ReadingCursor>(cursor);
   const storyRef = useRef<Story | null>(story);
@@ -139,10 +140,12 @@ export function useSherpa(story: Story | null): SherpaHookResult {
 
   // Sync refs with state
   useEffect(() => {
-    // Global Standard: Use Lightweight Small Model (35MB) for maximum speed
     cursorRef.current = cursor;
   }, [cursor]);
-  useEffect(() => { storyRef.current = story; }, [story]);
+  useEffect(() => { 
+    storyRef.current = story; 
+    setStory(story);
+  }, [story]);
   useEffect(() => { statusRef.current = status; }, [status]);
 
   // -------------------------------------------------------------------------
@@ -321,170 +324,113 @@ export function useSherpa(story: Story | null): SherpaHookResult {
   // Match results
   // -------------------------------------------------------------------------
 
-  const tokenQueueRef = useRef<string[]>([]);
-  const isProcessingQueueRef = useRef(false);
+  // [V9.0 WINDOW SEARCH ENGINE]
+  // This engine scans the recent transcript to find matches.
+  // It is immune to background noise because it can 'skip' over random words.
+  const scanForMatches = useCallback((allTokens: string[]) => {
+    if (!storyRef.current) return;
+    const curStory = JSON.parse(JSON.stringify(storyRef.current));
+    let activeCursor = { ...cursorRef.current };
+    let matchesFound = 0;
 
-  const processQueue = useCallback(async () => {
-    if (isProcessingQueueRef.current || tokenQueueRef.current.length === 0) return;
-    isProcessingQueueRef.current = true;
+    // We start searching from the last word we correctly identified.
+    let searchIdx = lastMatchedIndexRef.current + 1;
 
-    while (tokenQueueRef.current.length > 0) {
-        const token = tokenQueueRef.current.shift();
-        if (!token) break;
+    while (searchIdx < allTokens.length) {
+      const token = allTokens[searchIdx];
+      const targetWord = getWordAtCursor(curStory, activeCursor);
+      if (!targetWord) break;
 
-        const curStory = storyRef.current;
-        if (!curStory) break;
+      const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
+      const distance = levenshteinDistance(token, normalizedTarget);
+      
+      // LOOSE MATCHING (V9.0)
+      if (token === normalizedTarget || distance <= 2) {
+        targetWord.status = "correct";
+        lastMatchedIndexRef.current = searchIdx;
+        matchesFound++;
 
-        let activeCursor = { ...cursorRef.current };
-        if (activeCursor.wordIndex === -1) break;
-
-        const targetWord = getWordAtCursor(curStory, activeCursor);
-        if (!targetWord) break;
-
-        const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
-        
-        // --- BALANCED TOLERANCE LOGIC ---
-        // [V7.7 PHONETIC GUARD]
-        // If the recognized token is just a tiny fragment (1-2 chars) 
-        // but the target word is long, ignore it. This stops random background "clicks"
-        // and "s" sounds from matching real words.
-        if (token.length <= 2 && normalizedTarget.length > 4) return;
-
-        const distance = levenshteinDistance(token, normalizedTarget);
-        const isExact = token === normalizedTarget;
-        // [V7.6 SUPER-SMOOTH STRICTNESS]
-        // Allow 2 errors for any word to ensure instant highlighting and "Smooth Flow".
-        const isFuzzy = distance <= 2;
-
-        if (isExact || isFuzzy) {
-            targetWord.status = "correct";
-            correctCountRef.current++;
-            setCorrectCount(correctCountRef.current);
-
-            const next = advanceCursor(curStory, activeCursor);
-            if (next) {
-                const nextWord = getWordAtCursor(curStory, next);
-                if (nextWord) {
-                    nextWord.status = "active";
-                    activeCursor = next; 
-                }
-            } else {
-                activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-                setStatus("ready");
-            }
-            
-            setCursor(activeCursor);
-            cursorRef.current = activeCursor;
-
-            // [V8.4 FINAL ZERO-FAILURE SYNC]
-            // We update the clock using the shared tokens ref.
-            lastMatchedIndexRef.current = allTokensRef.current.indexOf(token, lastMatchedIndexRef.current);
+        const next = advanceCursor(curStory, activeCursor);
+        if (next) {
+          const nextWord = getWordAtCursor(curStory, next);
+          if (nextWord) {
+            nextWord.status = "active";
+            activeCursor = next;
+          }
         } else {
-            // [V8.0 SMART LOOKAHEAD]
-            // We look ahead up to 4 words. 
-            // We ONLY jump and mark previous words as skipped (Red) 
-            // if we hear a CLEAR match for a word further ahead.
-            let lookaheadCursor: ReadingCursor | null = { ...activeCursor };
-            let foundMatch = false;
-            
-            for (let j = 0; j < 4; j++) {
-                const nextCandidate = advanceCursor(curStory, lookaheadCursor as ReadingCursor);
-                if (!nextCandidate) break;
-                lookaheadCursor = nextCandidate;
-
-                const aheadWord = getWordAtCursor(curStory, lookaheadCursor);
-                if (!aheadWord) break;
-
-                const normAhead = normalizeWord(aheadWord.text).toLowerCase();
-                const distAhead = levenshteinDistance(token, normAhead);
-                
-                // [V8.0 SEQUENCE ANCHORING]
-                // To prevent TV noise from skipping words, we require a CLOSE match (dist <= 1)
-                // for jumping ahead. 
-                if (token === normAhead || distAhead <= 1) {
-                    // [V8.1 UNSTOPPABLE FLOW]
-                    // If we jump ahead, we look at the words we skipped.
-                    let catchupPtr = activeCursor;
-                    while (catchupPtr && (catchupPtr.wordIndex !== lookaheadCursor.wordIndex || catchupPtr.chunkIndex !== lookaheadCursor.chunkIndex)) {
-                        const skipWord = getWordAtCursor(curStory, catchupPtr);
-                        if (skipWord) {
-                            // If we are still in the SAME sentence, mark it Correct (Green).
-                            // Only mark Red (Skipped) if we jump to a DIFFERENT sentence.
-                            if (catchupPtr.sentenceIndex === lookaheadCursor.sentenceIndex) {
-                                skipWord.status = "correct";
-                            } else {
-                                skipWord.status = "skipped";
-                            }
-                        }
-                        catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
-                    }
-
-                    aheadWord.status = "correct";
-                    correctCountRef.current++;
-                    setCorrectCount(correctCountRef.current);
-
-                    const finalNext = advanceCursor(curStory, lookaheadCursor);
-                    if (finalNext) {
-                        const finalNextWord = getWordAtCursor(curStory, finalNext);
-                        if (finalNextWord) {
-                            finalNextWord.status = "active";
-                            activeCursor = finalNext; 
-                        }
-                    } else {
-                        activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-                        setStatus("ready");
-                    }
-                    
-                    setCursor(activeCursor);
-                    cursorRef.current = activeCursor;
-                    
-                    // [V8.4 FINAL ZERO-FAILURE SYNC]
-                    lastMatchedIndexRef.current = allTokensRef.current.indexOf(token, lastMatchedIndexRef.current);
-                    
-                    foundMatch = true;
-                    break;
-                }
-            }
-            if (foundMatch) continue;
+          activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+          break;
         }
+      } else {
+        // LOOKAHEAD: Try the next 3 words in the story to see if the user skipped
+        let jumpFound = false;
+        let jumpCursor = { ...activeCursor };
+        
+        for (let j = 0; j < 3; j++) {
+            const nextCand = advanceCursor(curStory, jumpCursor);
+            if (!nextCand) break;
+            jumpCursor = nextCand;
+            
+            const aheadWord = getWordAtCursor(curStory, jumpCursor);
+            if (!aheadWord) break;
+            
+            const normAhead = normalizeWord(aheadWord.text).toLowerCase();
+            if (token === normAhead || levenshteinDistance(token, normAhead) <= 1) {
+                // JUMP SUCCESS
+                let catchupPtr = activeCursor;
+                while (catchupPtr && (catchupPtr.wordIndex !== jumpCursor.wordIndex || catchupPtr.chunkIndex !== jumpCursor.chunkIndex)) {
+                    const skipWord = getWordAtCursor(curStory, catchupPtr);
+                    if (skipWord) {
+                        skipWord.status = (catchupPtr.sentenceIndex === jumpCursor.sentenceIndex) ? "correct" : "skipped";
+                    }
+                    catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
+                }
+                
+                aheadWord.status = "correct";
+                lastMatchedIndexRef.current = searchIdx;
+                matchesFound++;
+                
+                const finalNext = advanceCursor(curStory, jumpCursor);
+                if (finalNext) {
+                  const finalNextWord = getWordAtCursor(curStory, finalNext);
+                  if (finalNextWord) {
+                    finalNextWord.status = "active";
+                    activeCursor = finalNext;
+                  }
+                } else {
+                  activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+                }
+                jumpFound = true;
+                break;
+            }
+        }
+        
+        if (!jumpFound) {
+            // If the current token doesn't match the current word OR a jump, 
+            // it's probably background noise. We move to the next token in the audio.
+            searchIdx++;
+            continue;
+        }
+      }
+      
+      searchIdx++;
     }
-    isProcessingQueueRef.current = false;
-  }, [setCursor, setCorrectCount]);
 
-  const lastMatchedIndexRef = useRef(-1);
-  const allTokensRef = useRef<string[]>([]);
+    if (matchesFound > 0) {
+      setCursor(activeCursor);
+      cursorRef.current = activeCursor;
+      setStory(curStory);
+      storyRef.current = curStory;
+    }
+  }, [setCursor, setStory]);
 
   const processResult = useCallback((text: string) => {
     if (statusRef.current !== "listening") return;
-    
     const allTokens = text.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
-    allTokensRef.current = allTokens; // Store in shared memory
+    if (allTokens.length === 0) return;
     
-    if (allTokens.length === 0) {
-        lastMatchedIndexRef.current = -1;
-        return;
-    }
-
-    // FRONTIER-SEARCH: We only look at words that appear AFTER our last successful match
-    // in the current speech result. This is immune to the "Say it Twice" correction bug.
-    const searchFrom = lastMatchedIndexRef.current + 1;
-
-    // We look at ALL tokens starting from our last successful match.
-    // This ensures that if you speak two or three words quickly, 
-    // the AI catches ALL of them without dropping any.
-    const frontier = allTokens.slice(searchFrom);
-
-    if (frontier.length > 0) {
-        // Find the FIRST word in the frontier that hasn't been queued
-        // To be safe, we just push the frontier words into the queue
-        // and let the sequencer handle them one by one.
-        tokenQueueRef.current.push(...frontier);
-        
-        // Update the marker so we don't process these specific words again
-        lastMatchedIndexRef.current = allTokens.length - 1;
-        processQueue();
-    }
-  }, [processQueue]);
+    scanForMatches(allTokens);
+  }, [scanForMatches]);
 
   // Reset the count when the student stops or starts
   useEffect(() => {
