@@ -379,12 +379,25 @@ export function useSherpa(
             
             const normAhead = normalizeWord(aheadWord.text).toLowerCase();
             if (token === normAhead || levenshteinDistance(token, normAhead) <= 1) {
-                // JUMP SUCCESS
+                // [V10.0 SMART RECOVERY]
+                // We check every word we are about to skip.
                 let catchupPtr = activeCursor;
                 while (catchupPtr && (catchupPtr.wordIndex !== jumpCursor.wordIndex || catchupPtr.chunkIndex !== jumpCursor.chunkIndex)) {
                     const skipWord = getWordAtCursor(curStory, catchupPtr);
                     if (skipWord) {
-                        skipWord.status = (catchupPtr.sentenceIndex === jumpCursor.sentenceIndex) ? "correct" : "skipped";
+                        const skipNorm = normalizeWord(skipWord.text).toLowerCase();
+                        
+                        // SECOND CHANCE: Check if this word was actually spoken 
+                        // somewhere in the recent transcript window.
+                        const wasSpoken = allTokens.slice(Math.max(0, searchIdx - 3), searchIdx + 1).some(t => 
+                            t === skipNorm || levenshteinDistance(t, skipNorm) <= 1
+                        );
+
+                        if (wasSpoken || skipWord.text.length <= 3) {
+                            skipWord.status = "correct"; // AI missed it, but we found it!
+                        } else {
+                            skipWord.status = "skipped"; // Truly skipped by the user.
+                        }
                     }
                     catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
                 }
