@@ -467,10 +467,11 @@ export function useSherpa(story: Story | null): SherpaHookResult {
     // FRONTIER-SEARCH: We only look at words that appear AFTER our last successful match
     // in the current speech result. This is immune to the "Say it Twice" correction bug.
     const searchFrom = lastMatchedIndexRef.current + 1;
-    
-    // We only look at the "Leading Edge" (the very last word heard) to focus 
-    // exclusively on the student's current voice.
-    const frontier = allTokens.slice(Math.max(searchFrom, allTokens.length - 1));
+
+    // We look at ALL tokens starting from our last successful match.
+    // This ensures that if you speak two or three words quickly, 
+    // the AI catches ALL of them without dropping any.
+    const frontier = allTokens.slice(searchFrom);
 
     if (frontier.length > 0) {
         // Find the FIRST word in the frontier that hasn't been queued
