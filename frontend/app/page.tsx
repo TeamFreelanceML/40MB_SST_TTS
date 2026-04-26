@@ -54,6 +54,7 @@ export default function ReadingApp() {
   const lastCursorKeyRef = useRef<string>("");
   const lastRecognizedAttemptRef = useRef<string>("");
   const helperAdvanceRef = useRef(false);
+  const helperStepRef = useRef(0);
   const promptStageRef = useRef<0 | 1 | 2>(0);
   const ignoreRecognizedUntilRef = useRef(0);
   const isAdvancingRef = useRef(false); // [HARDENING] Debounce flag to prevent double-skips
