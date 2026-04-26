@@ -142,39 +142,17 @@ body {
   cursor: default;
 }
 
-/* Active word — the word the reader should say next */
+/* Active word — Clean focus, no distracting boxes or underlines */
 .word-active {
-  color: var(--accent-amber);
-  font-weight: 700;
-  text-shadow: 
-    0 0 15px var(--accent-amber-glow),
-    0 0 30px rgba(99, 102, 241, 0.2); /* Subtle indigo secondary glow */
-  animation: pulse-glow 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  position: relative;
-  z-index: 10;
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
-.word-active::after {
-  content: "";
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--accent-amber), #6366f1);
-  border-radius: 4px;
-  animation: underline-slide 1.5s ease-in-out infinite;
-  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
-}
-
-/* Correctly read word */
+/* Correctly read word — Smooth Emerald Green */
 .word-correct {
-  color: var(--accent-emerald);
-  text-decoration-line: underline;
-  text-decoration-style: solid;
-  text-decoration-color: rgba(16, 185, 129, 0.4);
-  text-underline-offset: 4px;
-  text-decoration-thickness: 2px;
+  color: var(--accent-emerald) !important;
+  font-weight: 800 !important;
+  text-decoration: none !important;
 }
 
 /* Skipped and error words all use the Red Stripe style */
@@ -203,6 +181,11 @@ body {
    ------------------------------------------------------------------------- */
 .chunk-active {
   position: relative;
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+  border-radius: 0.6rem;
+  padding: 2px 4px;
+  transition: all 0.3s ease;
 }
 
 .chunk-complete .word-correct {

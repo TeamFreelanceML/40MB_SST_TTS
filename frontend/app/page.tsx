@@ -433,22 +433,6 @@ export default function ReadingApp() {
 
   return (
     <main className="min-h-screen bg-[#0B0F19] text-slate-200 font-sans flex flex-col relative pb-32">
-      <style>{`
-        .word-active {
-          /* No special box highlight - keep it clean */
-          color: white !important;
-        }
-        .word-correct {
-          color: #10b981 !important; /* Emerald Green */
-          font-weight: 800 !important;
-          text-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
-        }
-        .word-skipped {
-          color: #ef4444 !important; /* Red */
-          text-decoration: line-through !important;
-          opacity: 0.6 !important;
-        }
-      `}</style>
       
       {/* Header */}
       <div className="flex items-center justify-center pt-8 pb-4">
