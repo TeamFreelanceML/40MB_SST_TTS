@@ -376,10 +376,9 @@ export function useSherpa(story: Story | null): SherpaHookResult {
             setCursor(activeCursor);
             cursorRef.current = activeCursor;
 
-            // [V8.2 FINAL AUDIT FIX]
-            // We MUST update the engine's clock even for normal matches.
-            // This prevents the AI from looking at the same word twice.
-            lastMatchedIndexRef.current = allTokens.indexOf(token, lastMatchedIndexRef.current);
+            // [V8.4 FINAL ZERO-FAILURE SYNC]
+            // We update the clock using the shared tokens ref.
+            lastMatchedIndexRef.current = allTokensRef.current.indexOf(token, lastMatchedIndexRef.current);
         } else {
             // [V8.0 SMART LOOKAHEAD]
             // We look ahead up to 4 words. 
@@ -439,9 +438,8 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                     setCursor(activeCursor);
                     cursorRef.current = activeCursor;
                     
-                    // [V8.1 SYNC FIX] Force the engine to sync its result index to the jump.
-                    // This prevents the "Stay Silent" bug after a jump.
-                    lastMatchedIndexRef.current = allTokens.indexOf(token, lastMatchedIndexRef.current);
+                    // [V8.4 FINAL ZERO-FAILURE SYNC]
+                    lastMatchedIndexRef.current = allTokensRef.current.indexOf(token, lastMatchedIndexRef.current);
                     
                     foundMatch = true;
                     break;
@@ -454,11 +452,14 @@ export function useSherpa(story: Story | null): SherpaHookResult {
   }, [setCursor, setCorrectCount]);
 
   const lastMatchedIndexRef = useRef(-1);
+  const allTokensRef = useRef<string[]>([]);
 
   const processResult = useCallback((text: string) => {
     if (statusRef.current !== "listening") return;
     
     const allTokens = text.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
+    allTokensRef.current = allTokens; // Store in shared memory
+    
     if (allTokens.length === 0) {
         lastMatchedIndexRef.current = -1;
         return;
