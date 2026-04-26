@@ -439,7 +439,6 @@ export function useSherpa(
   useEffect(() => {
     if (status === "ready") {
         lastMatchedIndexRef.current = -1;
-        tokenQueueRef.current = [];
     }
   }, [status]);
 
