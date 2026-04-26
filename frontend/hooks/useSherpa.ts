@@ -376,11 +376,14 @@ export function useSherpa(story: Story | null): SherpaHookResult {
             setCursor(activeCursor);
             cursorRef.current = activeCursor;
         } else {
-            // [V7.2 ULTRA-TIGHT LOOKAHEAD]
-            // We only look ahead at the next 2 words to ignore background noise.
+            // [V8.0 SMART LOOKAHEAD]
+            // We look ahead up to 4 words. 
+            // We ONLY jump and mark previous words as skipped (Red) 
+            // if we hear a CLEAR match for a word further ahead.
             let lookaheadCursor: ReadingCursor | null = { ...activeCursor };
             let foundMatch = false;
-            for (let j = 0; j < 2; j++) {
+            
+            for (let j = 0; j < 4; j++) {
                 const nextCandidate = advanceCursor(curStory, lookaheadCursor as ReadingCursor);
                 if (!nextCandidate) break;
                 lookaheadCursor = nextCandidate;
@@ -391,41 +394,45 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 const normAhead = normalizeWord(aheadWord.text).toLowerCase();
                 const distAhead = levenshteinDistance(token, normAhead);
                 
-                // [V7.5 NO-SKIP GUARD] 
-                if (token === normAhead || distAhead <= 2) {
-                    // Match found! 
-                    // We only mark skipped tiny words as "Correct" (Catch-up) to keep the flow smooth.
+                // [V8.0 SEQUENCE ANCHORING]
+                // To prevent TV noise from skipping words, we require a CLOSE match (dist <= 1)
+                // for jumping ahead. 
+                if (token === normAhead || distAhead <= 1) {
+                    // JUMP FOUND! 
+                    // Mark intermediate tiny words as Correct, long words as Skipped (Red).
                     let catchupPtr = activeCursor;
                     while (catchupPtr && (catchupPtr.wordIndex !== lookaheadCursor.wordIndex || catchupPtr.chunkIndex !== lookaheadCursor.chunkIndex)) {
                         const skipWord = getWordAtCursor(curStory, catchupPtr);
                         if (skipWord) {
                             if (skipWord.text.length <= 3) {
-                                skipWord.status = "correct";
+                                skipWord.status = "correct"; // Tiny words turn green
+                            } else {
+                                skipWord.status = "skipped"; // Long words turn red
                             }
                         }
                         catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
                     }
 
-                aheadWord.status = "correct";
-                correctCountRef.current++;
-                setCorrectCount(correctCountRef.current);
+                    aheadWord.status = "correct";
+                    correctCountRef.current++;
+                    setCorrectCount(correctCountRef.current);
 
-                const finalNext = advanceCursor(curStory, lookaheadCursor);
-                if (finalNext) {
-                    const finalNextWord = getWordAtCursor(curStory, finalNext);
-                    if (finalNextWord) {
-                        finalNextWord.status = "active";
-                        activeCursor = finalNext; 
+                    const finalNext = advanceCursor(curStory, lookaheadCursor);
+                    if (finalNext) {
+                        const finalNextWord = getWordAtCursor(curStory, finalNext);
+                        if (finalNextWord) {
+                            finalNextWord.status = "active";
+                            activeCursor = finalNext; 
+                        }
+                    } else {
+                        activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+                        setStatus("ready");
                     }
-                } else {
-                    activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-                    setStatus("ready");
-                }
-                
-                setCursor(activeCursor);
-                cursorRef.current = activeCursor;
-                foundMatch = true;
-                break;
+                    
+                    setCursor(activeCursor);
+                    cursorRef.current = activeCursor;
+                    foundMatch = true;
+                    break;
                 }
             }
             if (foundMatch) continue;
@@ -597,14 +604,10 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         }
         const rms = Math.sqrt(sum / inputData.length);
         
-        // If volume is too low, ignore. 0.007 is the high-sensitivity sweet spot.
-        if (rms < 0.007) {
-            // [V7.7 AUTO-PURGE] 
-            // If it's silent, we clear the last result so background noise 
-            // doesn't "build up" into a word over time.
-            lastResultRef.current = ""; 
-            return;
-        } 
+        // [V8.0 DYNAMIC HEARING]
+        // If volume is extremely low, ignore. 
+        // We no longer clear lastResultRef to ensure continuous speech flow.
+        if (rms < 0.003) return; 
 
         // [V5.1 CRITICAL FIX] Use the ACTUAL Context Sample Rate
         // Some browsers ignore the 16000 request and use 48000. 
