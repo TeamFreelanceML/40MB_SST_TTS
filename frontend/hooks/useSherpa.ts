@@ -365,13 +365,15 @@ export function useSherpa(
           break;
         }
       } else {
-        // [V11.0 DOUBLE-WORD ANCHOR]
-        // To prevent accidental jumps from short words or noise,
-        // we require TWO consecutive words to match before we skip ahead.
+        // [V11.1 TURBO-SCAN ENGINE]
+        // We look ahead up to 10 words to ensure we never get "stuck" during fast reading.
         let jumpFound = false;
         let jumpCursor = { ...activeCursor };
         
-        for (let j = 0; j < 4; j++) {
+        // MOMENTUM: If we just matched a word, we are more confident to follow the next one.
+        const hasMomentum = matchesFound > 0;
+
+        for (let j = 0; j < 10; j++) {
             const nextCand = advanceCursor(curStory, jumpCursor);
             if (!nextCand) break;
             jumpCursor = nextCand;
@@ -380,19 +382,20 @@ export function useSherpa(
             if (!aheadWord) break;
             
             const normAhead = normalizeWord(aheadWord.text).toLowerCase();
-            const isAheadMatch = token === normAhead || levenshteinDistance(token, normAhead) <= 1;
+            const distAhead = levenshteinDistance(token, normAhead);
+            const isAheadMatch = token === normAhead || distAhead <= (hasMomentum ? 2 : 1);
 
             if (isAheadMatch) {
-                // Potential jump! Check the NEXT token to confirm.
+                // [V11.1 FAST FOLLOW]
+                // If we have momentum (reading fast) OR the word is long, we jump immediately.
+                // We only require a "Double Anchor" if we are starting from a cold stop.
                 const nextToken = allTokens[searchIdx + 1];
                 const followingCand = advanceCursor(curStory, jumpCursor);
                 const followingWord = followingCand ? getWordAtCursor(curStory, followingCand) : null;
                 const normFollowing = followingWord ? normalizeWord(followingWord.text).toLowerCase() : null;
 
-                // [V11.0 ANCHOR RULE]
-                // Jump if: (Next word matches) OR (Ahead word is long > 6 chars)
-                const isConfirmed = (nextToken && normFollowing && (nextToken === normFollowing || levenshteinDistance(nextToken, normFollowing) <= 1)) 
-                                    || (normAhead.length > 6);
+                const isConfirmed = hasMomentum || normAhead.length > 4 || 
+                                    (nextToken && normFollowing && (nextToken === normFollowing || levenshteinDistance(nextToken, normFollowing) <= 1));
 
                 if (isConfirmed) {
                     let catchupPtr = activeCursor;
