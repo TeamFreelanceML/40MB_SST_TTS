@@ -375,6 +375,11 @@ export function useSherpa(story: Story | null): SherpaHookResult {
             
             setCursor(activeCursor);
             cursorRef.current = activeCursor;
+
+            // [V8.2 FINAL AUDIT FIX]
+            // We MUST update the engine's clock even for normal matches.
+            // This prevents the AI from looking at the same word twice.
+            lastMatchedIndexRef.current = allTokens.indexOf(token, lastMatchedIndexRef.current);
         } else {
             // [V8.0 SMART LOOKAHEAD]
             // We look ahead up to 4 words. 
