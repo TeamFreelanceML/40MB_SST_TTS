@@ -147,7 +147,6 @@ export function useSherpa(
   }, [cursor]);
   useEffect(() => { 
     storyRef.current = story; 
-    setStory(story);
   }, [story]);
   useEffect(() => { statusRef.current = status; }, [status]);
 
