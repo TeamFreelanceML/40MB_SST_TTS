@@ -53,3 +53,4 @@ httptools>=0.6.1; sys_platform != "win32"   # Faster HTTP parser for uvicorn
 # ── Optional: Monitoring ──────────────────────────────────────────────────────
 # Uncomment to enable Celery worker dashboard at http://localhost:5555
 # flower>=2.0.1
+apscheduler>=3.10.4
