@@ -14,17 +14,13 @@ Flow:
         → if pending:  return {status: "processing", completed: X/N}
 """
 
-import asyncio
-import logging
-import os
-import uuid
-import time
 import json
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from apscheduler.schedulers.background import BackgroundScheduler
 import redis as _redis_module
 
 from fastapi import FastAPI, HTTPException, Depends, Security, Path as FastAPIPath
@@ -133,7 +129,27 @@ async def lifespan(app: FastAPI):
         logger.warning("Prewarm dispatch failed (non-fatal): %s", prewarm_err)
 
     logger.info("API ready | Redis: %s", os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
+
+    # --- Background Cleanup Job (Every 24 Hours) ---
+    scheduler = BackgroundScheduler()
+    def _cleanup_task():
+        logger.info("Running background cleanup of audio_cache...")
+        cutoff = time.time() - (24 * 3600)
+        count = 0
+        for f in AUDIO_CACHE_DIR.glob("*.wav"):
+            if f.stat().st_mtime < cutoff:
+                f.unlink()
+                count += 1
+        logger.info("Cleanup complete. Removed %d stale audio files.", count)
+
+    scheduler.add_job(_cleanup_task, 'interval', hours=24)
+    scheduler.start()
+    app.state.scheduler = scheduler
+
     yield
+    
+    if hasattr(app.state, "scheduler"):
+        app.state.scheduler.shutdown()
 
 
 app = FastAPI(
@@ -544,9 +560,31 @@ async def narrate_word(request: Request, word_request: WordNarrationRequest, _: 
     client_voice_id = word_request.voice.voice_id
     registry_key    = resolve_kokoro_voice_key(client_voice_id)
     target_wpm      = word_request.speech_config.wpm
-    word_text       = word_request.word
+    word_text       = word_request.word.strip().lower()
 
-    logger.info("Word Level Gen | voice=%s wpm=%d word='%s'", client_voice_id, target_wpm, word_text)
+    # --- Redis Cache Check (Production Hardening) ---
+    cache_key = f"tts_cache:{registry_key}:{word_text}"
+    try:
+        r = _get_redis()
+        cached_data = r.get(cache_key)
+        if cached_data:
+            result = json.loads(cached_data)
+            logger.info("Cache HIT | word='%s' voice=%s", word_text, registry_key)
+            return JSONResponse(content={
+                "audio": {
+                    "url":         result["audio_url"],
+                    "duration_ms": result["duration_ms"],
+                },
+                "metadata": {
+                    "wpm":      target_wpm,
+                    "voice_id": client_voice_id,
+                    "language": word_request.voice.language,
+                    "cached":   True,
+                }
+            })
+        logger.info("Cache MISS | word='%s' voice=%s", word_text, registry_key)
+    except Exception as e:
+        logger.warning("Redis cache read failed: %s", e)
 
     # Dispatch to Celery but wait for it (One-shot)
     task = synthesize_chunk_task.apply_async(
@@ -565,6 +603,16 @@ async def narrate_word(request: Request, word_request: WordNarrationRequest, _: 
         # Wait for result with a production timeout
         result = await asyncio.to_thread(task.get, timeout=5.0)
         
+        # --- Save to Cache (24h TTL) ---
+        try:
+            r = _get_redis()
+            r.setex(cache_key, 86400, json.dumps({
+                "audio_url":   result["audio_url"],
+                "duration_ms": result["duration_ms"],
+            }))
+        except Exception:
+            pass
+
         return JSONResponse(content={
             "audio": {
                 "url":         result["audio_url"],
@@ -574,6 +622,7 @@ async def narrate_word(request: Request, word_request: WordNarrationRequest, _: 
                 "wpm":      target_wpm,
                 "voice_id": client_voice_id,
                 "language": word_request.voice.language,
+                "cached":   False,
             }
         })
     except Exception as e:

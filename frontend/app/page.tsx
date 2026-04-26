@@ -54,9 +54,9 @@ export default function ReadingApp() {
   const lastCursorKeyRef = useRef<string>("");
   const lastRecognizedAttemptRef = useRef<string>("");
   const helperAdvanceRef = useRef(false);
-  const helperStepRef = useRef(0);
   const promptStageRef = useRef<0 | 1 | 2>(0);
   const ignoreRecognizedUntilRef = useRef(0);
+  const isAdvancingRef = useRef(false); // [HARDENING] Debounce flag to prevent double-skips
 
   const getCursorKey = useCallback(() => {
     return `${cursor.paragraphIndex}:${cursor.sentenceIndex}:${cursor.chunkIndex}:${cursor.wordIndex}`;
@@ -185,9 +185,13 @@ export default function ReadingApp() {
         }
         stopSherpa();
         const finalBlob = await stopRecording();
+        
+        // [HARDENING] Reset session state immediately
+        isAdvancingRef.current = false;
+        helperStepRef.current = 0;
+        promptStageRef.current = 0;
+        
         if (finalBlob) {
-          // Use EVALUATE_API_URL if needed, but the hook might handle it.
-          // I will check useEvaluation.ts next.
           evaluateReading(finalBlob, STORY_TEXT, helperSkippedWordsRef.current);
         }
     } catch (err) {
@@ -372,8 +376,15 @@ export default function ReadingApp() {
             word: activeWord.display,
           });
         }
-        advanceManual("skipped");
-        resetIdleTracking("Let's keep going with the next word.");
+
+        // [HARDENING] Debounced Advance
+        if (!isAdvancingRef.current) {
+          isAdvancingRef.current = true;
+          advanceManual("skipped");
+          resetIdleTracking("Let's keep going with the next word.");
+          setTimeout(() => { isAdvancingRef.current = false; }, 400);
+        }
+        
         promptActiveRef.current = false;
       })();
     }, 500);

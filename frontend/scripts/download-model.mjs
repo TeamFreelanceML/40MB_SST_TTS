@@ -137,11 +137,15 @@ async function downloadFile(url, dest, retries = 3) {
   ];
 
   for (const model of models) {
+    if (fs.existsSync(model.dest) && fs.statSync(model.dest).size > 0) {
+      console.log(`- Skipping ${model.name} (Already exists)`);
+      continue;
+    }
     console.log(`- Fetching ${model.name}...`);
     try {
       await downloadFile(model.url, model.dest);
     } catch (err) {
-      console.error(`\nFailed to download ${model.name}: ${err.message}`);
+      console.error(`\n[CRITICAL] Failed to download ${model.name}: ${err.message}`);
       process.exit(1);
     }
   }
