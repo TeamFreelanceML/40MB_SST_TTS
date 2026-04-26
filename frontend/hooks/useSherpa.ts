@@ -414,11 +414,26 @@ export function useSherpa(
 
                 if (isLong || isEndOfSentence || isSequence) {
                     let catchupPtr = activeCursor;
+                    let skipCount = 0;
+                    let skippedWords: any[] = [];
+                    
                     while (catchupPtr && (catchupPtr.wordIndex !== jumpCursor.wordIndex || catchupPtr.chunkIndex !== jumpCursor.chunkIndex)) {
                         const skipWord = getWordAtCursor(curStory, catchupPtr);
-                        if (skipWord) skipWord.status = "correct"; // Grace rule
+                        if (skipWord) {
+                            skippedWords.push(skipWord);
+                            skipCount++;
+                        }
                         catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
                     }
+                    
+                    // [V16.1] RESTORE RED STRIPS FOR 2+ WORDS
+                    skippedWords.forEach(sw => {
+                        if (skipCount > 1 && sw.text.length > 3) {
+                            sw.status = "skipped"; // Real skip
+                        } else {
+                            sw.status = "correct"; // Grace
+                        }
+                    });
                     
                     aheadWord.status = "correct";
                     lastMatchedIndexRef.current = searchIdx;

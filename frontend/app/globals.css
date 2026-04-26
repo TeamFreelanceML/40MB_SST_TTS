@@ -142,7 +142,6 @@ body {
   cursor: default;
 }
 
-/* Active word — Clean focus, no distracting boxes or underlines */
 .word-active {
   color: var(--text-primary);
   font-weight: 500;
@@ -181,11 +180,10 @@ body {
    ------------------------------------------------------------------------- */
 .chunk-active {
   position: relative;
-  background: rgba(59, 130, 246, 0.12);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
-  border-radius: 0.6rem;
-  padding: 2px 4px;
-  transition: all 0.3s ease;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0;
+  padding: 0;
 }
 
 .chunk-complete .word-correct {
