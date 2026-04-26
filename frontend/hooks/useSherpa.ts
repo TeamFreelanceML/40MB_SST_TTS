@@ -391,10 +391,18 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 // Use the same Refined Strictness for lookahead
                 if (token === normAhead || (normAhead.length > 3 && (distAhead <= 1 || (normAhead.length >= 6 && distAhead <= 2)))) {
                 // Match found! 
-                // [V6.0 FIX] STOP marking intermediate words as skipped automatically.
-                // This was causing "Correct" words to turn red if the engine jumped ahead.
-                // We now just move the cursor to the match.
-                
+                // [V7.3 SMOOTH FLOW] Catch-up logic for tiny words.
+                // If we jumped ahead, look at the words we skipped. 
+                // If they are tiny (<= 3 chars), mark them as 'correct' to keep the flow green.
+                let catchupPtr = activeCursor;
+                while (catchupPtr && (catchupPtr.wordIndex !== lookaheadCursor.wordIndex || catchupPtr.chunkIndex !== lookaheadCursor.chunkIndex)) {
+                    const skipWord = getWordAtCursor(curStory, catchupPtr);
+                    if (skipWord && skipWord.text.length <= 3) {
+                        skipWord.status = "correct";
+                    }
+                    catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
+                }
+
                 aheadWord.status = "correct";
                 correctCountRef.current++;
                 setCorrectCount(correctCountRef.current);
