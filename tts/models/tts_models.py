@@ -109,16 +109,7 @@ class WordMetadata(BaseModel):
 class WordNarrationRequest(BaseModel):
     voice: VoiceConfig
     speech_config: SpeechConfig
-    word: str = Field(max_length=50)
-
-    @field_validator("word")
-    @classmethod
-    def validate_word(cls, v: str) -> str:
-        # Production Hardening: Alphabetic only to prevent injection or invalid synthesis
-        clean = v.strip()
-        if not clean.replace("'", "").replace("-", "").isalpha():
-             raise ValueError("Word must be alphabetic only")
-        return clean
+    word: str = Field(max_length=100)
 
 
 class WordNarrationResponse(BaseModel):
