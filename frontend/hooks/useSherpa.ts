@@ -347,10 +347,9 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         // Allow 1 mistake for all words >= 2 letters. 
         const distance = levenshteinDistance(token, normalizedTarget);
         const isExact = token === normalizedTarget;
-        // [V7.1 REFINED STRICTNESS]
-        // Exact match is always allowed.
-        // Fuzzy (1-2 errors) only allowed for words longer than 3 characters.
-        const isFuzzy = normalizedTarget.length > 3 && (distance <= 1 || (normalizedTarget.length >= 6 && distance <= 2));
+        // [V7.4 SMART STRICTNESS]
+        // Allow 1 error for ANY word (relaxed), 2 errors for long words (6+ chars)
+        const isFuzzy = distance <= 1 || (normalizedTarget.length >= 6 && distance <= 2);
 
         if (isExact || isFuzzy) {
             targetWord.status = "correct";
@@ -388,8 +387,8 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 const normAhead = normalizeWord(aheadWord.text).toLowerCase();
                 const distAhead = levenshteinDistance(token, normAhead);
                 
-                // Use the same Refined Strictness for lookahead
-                if (token === normAhead || (normAhead.length > 3 && (distAhead <= 1 || (normAhead.length >= 6 && distAhead <= 2)))) {
+                // Use the same Smart Strictness for lookahead
+                if (token === normAhead || distAhead <= 1 || (normAhead.length >= 6 && distAhead <= 2)) {
                 // Match found! 
                 // [V7.3 SMOOTH FLOW] Catch-up logic for tiny words.
                 // If we jumped ahead, look at the words we skipped. 
@@ -596,8 +595,8 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         const rms = Math.sqrt(sum / inputData.length);
         
         // If volume is too low (silent student + background chatter), 
-        // ignore the audio completely. 0.008 is a safe threshold.
-        if (rms < 0.008) return; 
+        // ignore the audio completely. 0.01 is the production sweet spot.
+        if (rms < 0.01) return; 
 
         // [V5.1 CRITICAL FIX] Use the ACTUAL Context Sample Rate
         // Some browsers ignore the 16000 request and use 48000. 
