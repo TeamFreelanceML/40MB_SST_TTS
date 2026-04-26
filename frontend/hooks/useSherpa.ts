@@ -387,20 +387,20 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 const normAhead = normalizeWord(aheadWord.text).toLowerCase();
                 const distAhead = levenshteinDistance(token, normAhead);
                 
-                // Use the same Smart Strictness for lookahead
+                // [V7.5 NO-SKIP GUARD] 
                 if (token === normAhead || distAhead <= 1 || (normAhead.length >= 6 && distAhead <= 2)) {
-                // Match found! 
-                // [V7.3 SMOOTH FLOW] Catch-up logic for tiny words.
-                // If we jumped ahead, look at the words we skipped. 
-                // If they are tiny (<= 3 chars), mark them as 'correct' to keep the flow green.
-                let catchupPtr = activeCursor;
-                while (catchupPtr && (catchupPtr.wordIndex !== lookaheadCursor.wordIndex || catchupPtr.chunkIndex !== lookaheadCursor.chunkIndex)) {
-                    const skipWord = getWordAtCursor(curStory, catchupPtr);
-                    if (skipWord && skipWord.text.length <= 3) {
-                        skipWord.status = "correct";
+                    // Match found! 
+                    // We only mark skipped tiny words as "Correct" (Catch-up) to keep the flow smooth.
+                    let catchupPtr = activeCursor;
+                    while (catchupPtr && (catchupPtr.wordIndex !== lookaheadCursor.wordIndex || catchupPtr.chunkIndex !== lookaheadCursor.chunkIndex)) {
+                        const skipWord = getWordAtCursor(curStory, catchupPtr);
+                        if (skipWord) {
+                            if (skipWord.text.length <= 3) {
+                                skipWord.status = "correct";
+                            }
+                        }
+                        catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
                     }
-                    catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
-                }
 
                 aheadWord.status = "correct";
                 correctCountRef.current++;
