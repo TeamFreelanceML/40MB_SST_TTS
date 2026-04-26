@@ -398,10 +398,7 @@ export function useSherpa(
                 const followingCand = advanceCursor(curStory, jumpCursor);
                 const followingWord = followingCand ? getWordAtCursor(curStory, followingCand) : null;
                 
-                // JUMP RULES:
-                // 1. If it's a long word (>5 chars) -> JUMP.
-                // 2. If it's the last word in a sentence -> JUMP.
-                // 3. If there's a sequence after it -> JUMP.
+                // [V17.0 RHYTHM RULES]
                 const isLong = normAhead.length > 5;
                 const isEndOfSentence = !followingWord || (followingCand && followingCand.sentenceIndex !== jumpCursor.sentenceIndex);
                 
@@ -412,7 +409,15 @@ export function useSherpa(
                     if (t2 && (t2 === n2 || levenshteinDistance(t2, n2) <= 1)) isSequence = true;
                 }
 
-                if (isLong || isEndOfSentence || isSequence) {
+                // MOMENTUM: If we just matched a word, we can jump easily.
+                // But we NEVER jump for tiny words (the, is, of) without a sequence.
+                const hasMomentum = matchesFound > 0;
+                const isTiny = normAhead.length <= 3;
+                
+                const isConfirmed = isSequence || 
+                                    (!isTiny && (isLong || isEndOfSentence || hasMomentum));
+
+                if (isConfirmed) {
                     let catchupPtr = activeCursor;
                     let skipCount = 0;
                     let skippedWords: any[] = [];
