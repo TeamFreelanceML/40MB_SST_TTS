@@ -344,7 +344,12 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
         
         // --- BALANCED TOLERANCE LOGIC ---
-        // Allow 1 mistake for all words >= 2 letters. 
+        // [V7.7 PHONETIC GUARD]
+        // If the recognized token is just a tiny fragment (1-2 chars) 
+        // but the target word is long, ignore it. This stops random background "clicks"
+        // and "s" sounds from matching real words.
+        if (token.length <= 2 && normalizedTarget.length > 4) return;
+
         const distance = levenshteinDistance(token, normalizedTarget);
         const isExact = token === normalizedTarget;
         // [V7.6 SUPER-SMOOTH STRICTNESS]
@@ -593,7 +598,13 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         const rms = Math.sqrt(sum / inputData.length);
         
         // If volume is too low, ignore. 0.007 is the high-sensitivity sweet spot.
-        if (rms < 0.007) return; 
+        if (rms < 0.007) {
+            // [V7.7 AUTO-PURGE] 
+            // If it's silent, we clear the last result so background noise 
+            // doesn't "build up" into a word over time.
+            lastResultRef.current = ""; 
+            return;
+        } 
 
         // [V5.1 CRITICAL FIX] Use the ACTUAL Context Sample Rate
         // Some browsers ignore the 16000 request and use 48000. 
