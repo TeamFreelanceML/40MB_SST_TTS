@@ -11,17 +11,19 @@ def trim_trailing_silence(audio_path: str) -> str:
     """Trim only trailing silence while preserving the original speech timing."""
     trimmed_path = tempfile.NamedTemporaryFile(delete=False, suffix=".webm").name
 
-    # V2.0 Enhanced Filter Chain:
-    # 1. afftdn: FFT-based noise reduction (removes hiss/hum)
+    # V3.0 SUPER-CLEAN Filter Chain:
+    # 1. afftdn: Stronger FFT-based noise reduction (nr=22 for music removal)
     # 2. highpass: Removes low frequency rumble (< 200Hz)
-    # 3. areverse -> silenceremove -> areverse: Trims trailing silence
+    # 3. lowpass: Removes high frequency static (> 12kHz)
+    # 4. agate: Aggressive noise gate to silence background music during silence
+    # 5. areverse -> silenceremove -> areverse: Trims trailing silence
     ffmpeg_cmd = [
         "ffmpeg",
         "-y",
         "-i",
         audio_path,
         "-af",
-        "afftdn=nr=12:nf=-25,highpass=f=200,areverse,silenceremove=start_periods=1:start_silence=0.5:start_threshold=-45dB,areverse",
+        "afftdn=nr=22:nf=-20,highpass=f=200,lowpass=f=12000,agate=threshold=-32dB:ratio=2:attack=5:release=50,areverse,silenceremove=start_periods=1:start_silence=0.5:start_threshold=-45dB,areverse",
         "-c:a",
         "libopus",
         trimmed_path,
