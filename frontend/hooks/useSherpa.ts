@@ -398,16 +398,18 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 // To prevent TV noise from skipping words, we require a CLOSE match (dist <= 1)
                 // for jumping ahead. 
                 if (token === normAhead || distAhead <= 1) {
-                    // JUMP FOUND! 
-                    // Mark intermediate tiny words as Correct, long words as Skipped (Red).
+                    // [V8.1 UNSTOPPABLE FLOW]
+                    // If we jump ahead, we look at the words we skipped.
                     let catchupPtr = activeCursor;
                     while (catchupPtr && (catchupPtr.wordIndex !== lookaheadCursor.wordIndex || catchupPtr.chunkIndex !== lookaheadCursor.chunkIndex)) {
                         const skipWord = getWordAtCursor(curStory, catchupPtr);
                         if (skipWord) {
-                            if (skipWord.text.length <= 3) {
-                                skipWord.status = "correct"; // Tiny words turn green
+                            // If we are still in the SAME sentence, mark it Correct (Green).
+                            // Only mark Red (Skipped) if we jump to a DIFFERENT sentence.
+                            if (catchupPtr.sentenceIndex === lookaheadCursor.sentenceIndex) {
+                                skipWord.status = "correct";
                             } else {
-                                skipWord.status = "skipped"; // Long words turn red
+                                skipWord.status = "skipped";
                             }
                         }
                         catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
@@ -431,6 +433,11 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                     
                     setCursor(activeCursor);
                     cursorRef.current = activeCursor;
+                    
+                    // [V8.1 SYNC FIX] Force the engine to sync its result index to the jump.
+                    // This prevents the "Stay Silent" bug after a jump.
+                    lastMatchedIndexRef.current = allTokens.indexOf(token, lastMatchedIndexRef.current);
+                    
                     foundMatch = true;
                     break;
                 }
