@@ -442,6 +442,16 @@ export default function ReadingApp() {
           box-shadow: 0 0 10px rgba(99,102,241,0.5) !important;
           color: white !important;
         }
+        .word-correct {
+          color: #10b981 !important; /* Emerald Green */
+          font-weight: 700 !important;
+          border-bottom: 2px solid #10b981 !important;
+        }
+        .word-skipped {
+          color: #ef4444 !important; /* Red */
+          text-decoration: line-through !important;
+          opacity: 0.6 !important;
+        }
       `}</style>
       
       {/* Header */}
