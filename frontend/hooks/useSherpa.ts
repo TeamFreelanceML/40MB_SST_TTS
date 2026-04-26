@@ -365,11 +365,13 @@ export function useSherpa(
           break;
         }
       } else {
-        // LOOKAHEAD: Try the next 3 words in the story to see if the user skipped
+        // [V11.0 DOUBLE-WORD ANCHOR]
+        // To prevent accidental jumps from short words or noise,
+        // we require TWO consecutive words to match before we skip ahead.
         let jumpFound = false;
         let jumpCursor = { ...activeCursor };
         
-        for (let j = 0; j < 3; j++) {
+        for (let j = 0; j < 4; j++) {
             const nextCand = advanceCursor(curStory, jumpCursor);
             if (!nextCand) break;
             jumpCursor = nextCand;
@@ -378,46 +380,47 @@ export function useSherpa(
             if (!aheadWord) break;
             
             const normAhead = normalizeWord(aheadWord.text).toLowerCase();
-            if (token === normAhead || levenshteinDistance(token, normAhead) <= 1) {
-                // [V10.0 SMART RECOVERY]
-                // We check every word we are about to skip.
-                let catchupPtr = activeCursor;
-                while (catchupPtr && (catchupPtr.wordIndex !== jumpCursor.wordIndex || catchupPtr.chunkIndex !== jumpCursor.chunkIndex)) {
-                    const skipWord = getWordAtCursor(curStory, catchupPtr);
-                    if (skipWord) {
-                        const skipNorm = normalizeWord(skipWord.text).toLowerCase();
-                        
-                        // SECOND CHANCE: Check if this word was actually spoken 
-                        // somewhere in the recent transcript window.
-                        const wasSpoken = allTokens.slice(Math.max(0, searchIdx - 3), searchIdx + 1).some(t => 
-                            t === skipNorm || levenshteinDistance(t, skipNorm) <= 1
-                        );
+            const isAheadMatch = token === normAhead || levenshteinDistance(token, normAhead) <= 1;
 
-                        if (wasSpoken || skipWord.text.length <= 3) {
-                            skipWord.status = "correct"; // AI missed it, but we found it!
-                        } else {
-                            skipWord.status = "skipped"; // Truly skipped by the user.
+            if (isAheadMatch) {
+                // Potential jump! Check the NEXT token to confirm.
+                const nextToken = allTokens[searchIdx + 1];
+                const followingCand = advanceCursor(curStory, jumpCursor);
+                const followingWord = followingCand ? getWordAtCursor(curStory, followingCand) : null;
+                const normFollowing = followingWord ? normalizeWord(followingWord.text).toLowerCase() : null;
+
+                // [V11.0 ANCHOR RULE]
+                // Jump if: (Next word matches) OR (Ahead word is long > 6 chars)
+                const isConfirmed = (nextToken && normFollowing && (nextToken === normFollowing || levenshteinDistance(nextToken, normFollowing) <= 1)) 
+                                    || (normAhead.length > 6);
+
+                if (isConfirmed) {
+                    let catchupPtr = activeCursor;
+                    while (catchupPtr && (catchupPtr.wordIndex !== jumpCursor.wordIndex || catchupPtr.chunkIndex !== jumpCursor.chunkIndex)) {
+                        const skipWord = getWordAtCursor(curStory, catchupPtr);
+                        if (skipWord) {
+                            skipWord.status = "skipped"; 
                         }
+                        catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
                     }
-                    catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
+                    
+                    aheadWord.status = "correct";
+                    lastMatchedIndexRef.current = searchIdx;
+                    matchesFound++;
+                    
+                    const finalNext = advanceCursor(curStory, jumpCursor);
+                    if (finalNext) {
+                      const finalNextWord = getWordAtCursor(curStory, finalNext);
+                      if (finalNextWord) {
+                        finalNextWord.status = "active";
+                        activeCursor = finalNext;
+                      }
+                    } else {
+                      activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+                    }
+                    jumpFound = true;
+                    break;
                 }
-                
-                aheadWord.status = "correct";
-                lastMatchedIndexRef.current = searchIdx;
-                matchesFound++;
-                
-                const finalNext = advanceCursor(curStory, jumpCursor);
-                if (finalNext) {
-                  const finalNextWord = getWordAtCursor(curStory, finalNext);
-                  if (finalNextWord) {
-                    finalNextWord.status = "active";
-                    activeCursor = finalNext;
-                  }
-                } else {
-                  activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-                }
-                jumpFound = true;
-                break;
             }
         }
         
