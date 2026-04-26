@@ -347,9 +347,9 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         // Allow 1 mistake for all words >= 2 letters. 
         const distance = levenshteinDistance(token, normalizedTarget);
         const isExact = token === normalizedTarget;
-        // [V7.4 SMART STRICTNESS]
-        // Allow 1 error for ANY word (relaxed), 2 errors for long words (6+ chars)
-        const isFuzzy = distance <= 1 || (normalizedTarget.length >= 6 && distance <= 2);
+        // [V7.6 SUPER-SMOOTH STRICTNESS]
+        // Allow 2 errors for any word to ensure instant highlighting and "Smooth Flow".
+        const isFuzzy = distance <= 2;
 
         if (isExact || isFuzzy) {
             targetWord.status = "correct";
@@ -370,7 +370,6 @@ export function useSherpa(story: Story | null): SherpaHookResult {
             
             setCursor(activeCursor);
             cursorRef.current = activeCursor;
-            await new Promise(r => setTimeout(r, 60));
         } else {
             // [V7.2 ULTRA-TIGHT LOOKAHEAD]
             // We only look ahead at the next 2 words to ignore background noise.
@@ -388,7 +387,7 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 const distAhead = levenshteinDistance(token, normAhead);
                 
                 // [V7.5 NO-SKIP GUARD] 
-                if (token === normAhead || distAhead <= 1 || (normAhead.length >= 6 && distAhead <= 2)) {
+                if (token === normAhead || distAhead <= 2) {
                     // Match found! 
                     // We only mark skipped tiny words as "Correct" (Catch-up) to keep the flow smooth.
                     let catchupPtr = activeCursor;
@@ -420,7 +419,6 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 
                 setCursor(activeCursor);
                 cursorRef.current = activeCursor;
-                await new Promise(r => setTimeout(r, 60));
                 foundMatch = true;
                 break;
                 }
@@ -594,9 +592,8 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         }
         const rms = Math.sqrt(sum / inputData.length);
         
-        // If volume is too low (silent student + background chatter), 
-        // ignore the audio completely. 0.01 is the production sweet spot.
-        if (rms < 0.01) return; 
+        // If volume is too low, ignore. 0.007 is the high-sensitivity sweet spot.
+        if (rms < 0.007) return; 
 
         // [V5.1 CRITICAL FIX] Use the ACTUAL Context Sample Rate
         // Some browsers ignore the 16000 request and use 48000. 
