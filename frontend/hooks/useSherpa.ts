@@ -360,8 +360,8 @@ export function useSherpa(
       const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
       const dist = levenshteinDistance(token, normalizedTarget);
 
-      // [V15.0 AUDIT FIX] Higher sensitivity for whispers/fast reading (Dist 2)
-      if (token === normalizedTarget || dist <= 2) {
+      // [V18.0] Max sensitivity (Dist 3) to prevent repeating words
+      if (token === normalizedTarget || dist <= 3) {
         targetWord.status = "correct";
         lastMatchedIndexRef.current = searchIdx;
         matchesFound++;
@@ -372,7 +372,6 @@ export function useSherpa(
             const nextWord = getWordAtCursor(curStory, activeCursor);
             if (nextWord) nextWord.status = "active";
         } else {
-            // End of story reached
             activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
         }
         searchIdx++;
@@ -398,9 +397,10 @@ export function useSherpa(
                 const followingCand = advanceCursor(curStory, jumpCursor);
                 const followingWord = followingCand ? getWordAtCursor(curStory, followingCand) : null;
                 
-                // [V17.0 RHYTHM RULES]
+                // [V18.0 BULLETPROOF JUMP RULES]
                 const isLong = normAhead.length > 5;
                 const isEndOfSentence = !followingWord || (followingCand && followingCand.sentenceIndex !== jumpCursor.sentenceIndex);
+                const isSameSentence = jumpCursor.sentenceIndex === activeCursor.sentenceIndex;
                 
                 let isSequence = false;
                 if (followingWord) {
@@ -409,13 +409,9 @@ export function useSherpa(
                     if (t2 && (t2 === n2 || levenshteinDistance(t2, n2) <= 1)) isSequence = true;
                 }
 
-                // MOMENTUM: If we just matched a word, we can jump easily.
-                // But we NEVER jump for tiny words (the, is, of) without a sequence.
-                const hasMomentum = matchesFound > 0;
-                const isTiny = normAhead.length <= 3;
-                
-                const isConfirmed = isSequence || 
-                                    (!isTiny && (isLong || isEndOfSentence || hasMomentum));
+                // RULE: Jumps between sentences ALWAYS require a sequence.
+                // Jumps within the same sentence allow long words or end-of-sentence.
+                const isConfirmed = isSequence || (isSameSentence && (isLong || isEndOfSentence));
 
                 if (isConfirmed) {
                     let catchupPtr = activeCursor;
@@ -431,13 +427,10 @@ export function useSherpa(
                         catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
                     }
                     
-                    // [V16.1] RESTORE RED STRIPS FOR 2+ WORDS
                     skippedWords.forEach(sw => {
-                        if (skipCount > 1 && sw.text.length > 3) {
-                            sw.status = "skipped"; // Real skip
-                        } else {
-                            sw.status = "correct"; // Grace
-                        }
+                        // SkipCount > 1 is Red Strip. SkipCount 1 is Grace Green.
+                        if (skipCount > 1 && sw.text.length > 3) sw.status = "skipped";
+                        else sw.status = "correct";
                     });
                     
                     aheadWord.status = "correct";
