@@ -440,8 +440,8 @@ export default function ReadingApp() {
         }
         .word-correct {
           color: #10b981 !important; /* Emerald Green */
-          font-weight: 700 !important;
-          border-bottom: 2px solid #10b981 !important;
+          font-weight: 800 !important;
+          text-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
         }
         .word-skipped {
           color: #ef4444 !important; /* Red */

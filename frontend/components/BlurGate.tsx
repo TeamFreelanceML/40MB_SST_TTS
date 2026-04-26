@@ -67,12 +67,11 @@ function getParagraphStyles(distance: number): React.CSSProperties {
 function getChunkStyles(isActive: boolean): React.CSSProperties {
   return {
     display: "inline",
-    padding: "0.18rem 0.28rem",
-    borderRadius: "0.5rem",
-    background: "transparent",
-    boxShadow: "none",
-    transition:
-      "background 220ms ease, box-shadow 220ms ease, transform 220ms ease, opacity 220ms ease",
+    padding: "0.2rem 0.4rem",
+    borderRadius: "0.6rem",
+    background: isActive ? "rgba(59, 130, 246, 0.12)" : "transparent",
+    boxShadow: isActive ? "0 0 0 1px rgba(59, 130, 246, 0.2)" : "none",
+    transition: "all 300ms ease",
   };
 }
 
