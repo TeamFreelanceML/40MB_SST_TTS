@@ -332,13 +332,12 @@ export function useSherpa(
   const scanForMatches = useCallback((allTokens: string[]) => {
     if (!storyRef.current) return;
     
-    // [V12.0 MEMORY GUARD]
-    // If the engine reset its buffer, we must reset our search index.
+    // [V14.0 MEMORY GUARD]
     if (lastMatchedIndexRef.current >= allTokens.length) {
       lastMatchedIndexRef.current = -1;
     }
 
-    const curStory = JSON.parse(JSON.stringify(storyRef.current));
+    const curStory = { ...storyRef.current };
     let activeCursor = { ...cursorRef.current };
     let matchesFound = 0;
 
@@ -379,12 +378,12 @@ export function useSherpa(
           break;
         }
       } else {
-        // [V11.1 TURBO-SCAN ENGINE]
-        // We look ahead up to 10 words to ensure we never get "stuck" during fast reading.
+        // [V14.0 TRIPLE-ANCHOR JUMP]
+        // We look ahead up to 10 words. 
+        // We ONLY jump if we hear 3 words in a row OR a very unique word (>7 chars).
         let jumpFound = false;
         let jumpCursor = { ...activeCursor };
         
-        // MOMENTUM: If we just matched a word, we are more confident to follow the next one.
         const hasMomentum = matchesFound > 0;
 
         for (let j = 0; j < 10; j++) {
@@ -397,43 +396,36 @@ export function useSherpa(
             
             const normAhead = normalizeWord(aheadWord.text).toLowerCase();
             const distAhead = levenshteinDistance(token, normAhead);
-            const isAheadMatch = token === normAhead || distAhead <= (hasMomentum ? 2 : 1);
+            
+            // Strict jump matching
+            if (token === normAhead || distAhead <= 1) {
+                // Check for 3-word sequence or 1 long word
+                const t2 = allTokens[searchIdx + 1];
+                const t3 = allTokens[searchIdx + 2];
+                
+                const c2 = advanceCursor(curStory, jumpCursor);
+                const w2 = c2 ? getWordAtCursor(curStory, c2) : null;
+                const n2 = w2 ? normalizeWord(w2.text).toLowerCase() : null;
+                
+                const c3 = c2 ? advanceCursor(curStory, c2) : null;
+                const w3 = c3 ? getWordAtCursor(curStory, c3) : null;
+                const n3 = w3 ? normalizeWord(w3.text).toLowerCase() : null;
 
-            if (isAheadMatch) {
-                // [V11.1 FAST FOLLOW]
-                // If we have momentum (reading fast) OR the word is long, we jump immediately.
-                // We only require a "Double Anchor" if we are starting from a cold stop.
-                const nextToken = allTokens[searchIdx + 1];
-                const followingCand = advanceCursor(curStory, jumpCursor);
-                const followingWord = followingCand ? getWordAtCursor(curStory, followingCand) : null;
-                const normFollowing = followingWord ? normalizeWord(followingWord.text).toLowerCase() : null;
+                const isTriple = (t2 && n2 && (t2 === n2 || levenshteinDistance(t2, n2) <= 1)) &&
+                                 (t3 && n3 && (t3 === n3 || levenshteinDistance(t3, n3) <= 1));
+                
+                const isLong = normAhead.length >= 7;
 
-                const isConfirmed = hasMomentum || normAhead.length > 4 || 
-                                    (nextToken && normFollowing && (nextToken === normFollowing || levenshteinDistance(nextToken, normFollowing) <= 1));
-
-                if (isConfirmed) {
-                    // [V11.2 KIND-READING ENGINE]
-                    // We only mark words as Red (Skipped) if you skip a LARGE chunk.
-                    // If it's just one word or small words, we turn them Green (Grace).
+                if (isTriple || isLong || (hasMomentum && normAhead.length > 3)) {
                     let catchupPtr = activeCursor;
-                    let skipList: any[] = [];
                     while (catchupPtr && (catchupPtr.wordIndex !== jumpCursor.wordIndex || catchupPtr.chunkIndex !== jumpCursor.chunkIndex)) {
                         const skipWord = getWordAtCursor(curStory, catchupPtr);
-                        if (skipWord) skipList.push({ word: skipWord, ptr: { ...catchupPtr } });
+                        if (skipWord) {
+                            // [V11.2 Grace Rule] Single missed word is Green.
+                            skipWord.status = "correct"; 
+                        }
                         catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
                     }
-
-                    const actualSkips = skipList.filter(s => s.word.text.length > 3);
-                    
-                    skipList.forEach(s => {
-                        // GRACE RULE: If it's only 1 long word being skipped, turn it Green.
-                        // If it's multiple long words, turn them Red.
-                        if (actualSkips.length <= 1 || s.word.text.length <= 3) {
-                            s.word.status = "correct";
-                        } else {
-                            s.word.status = "skipped";
-                        }
-                    });
                     
                     aheadWord.status = "correct";
                     lastMatchedIndexRef.current = searchIdx;
