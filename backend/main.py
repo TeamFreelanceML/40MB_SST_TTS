@@ -7,6 +7,8 @@ import uvicorn
 import logging
 import traceback
 import json
+from fastapi.staticfiles import StaticFiles
+import uuid
 
 # Module imports
 from audio_preprocess_service import cleanup_temp_paths, trim_trailing_silence
@@ -42,6 +44,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ensure recordings directory exists and mount it
+RECORDINGS_DIR = "recordings"
+if not os.path.exists(RECORDINGS_DIR):
+    os.makedirs(RECORDINGS_DIR)
+app.mount("/recordings", StaticFiles(directory=RECORDINGS_DIR), name="recordings")
 
 # ENGINE INITIALIZATION
 logger.info(f"[STARTUP] Initializing Whisper Neural Engine ({MODEL_NAME})...")
@@ -115,10 +123,17 @@ async def evaluate_reading(
             # Metadata injection
             results["filename"] = audio.filename
             results["timing"] = timings.as_dict()
+            
+            # --- Save Cleaned Audio for Frontend Playback ---
+            recording_id = f"rec_{uuid.uuid4().hex[:12]}.wav"
+            recording_path = os.path.join(RECORDINGS_DIR, recording_id)
+            shutil.copy2(transcribe_path, recording_path)
+            results["audio_url"] = f"/recordings/{recording_id}"
+
             results.setdefault("metadata", {})
             results["metadata"]["processing_time_ms"] = results["timing"]["total_ms"]
             
-            logger.info("[PHASE 3] [SUCCESS] Evaluation result generated.")
+            logger.info("[PHASE 3] [SUCCESS] Evaluation result generated. Audio: %s", results["audio_url"])
             return results
 
         except HTTPException as he:

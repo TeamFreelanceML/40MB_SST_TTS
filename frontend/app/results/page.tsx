@@ -9,6 +9,9 @@ import {
   CheckCircle,
   FileAudio,
   RotateCcw,
+  Volume2,
+  Play,
+  Pause,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -84,6 +87,7 @@ interface EvaluationResult {
       gap_seconds: number;
     }>;
   };
+  audio_url?: string;
 }
 
 function ScoreProofCard({
@@ -300,6 +304,8 @@ export default function ResultsPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<EvaluationResult | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioInstance, setAudioInstance] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -313,6 +319,30 @@ export default function ResultsPage() {
       console.error("Parse Error:", err);
     }
   }, []);
+
+  const handleToggleAudio = () => {
+    if (!data?.audio_url) return;
+
+    if (isPlaying && audioInstance) {
+      audioInstance.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    // Proxy the URL through our bridge or use direct port 8000 for now
+    const API_BASE = process.env.NEXT_PUBLIC_EVALUATION_API_BASE_URL || "http://localhost:8000";
+    const fullUrl = `${API_BASE}${data.audio_url}`;
+
+    const audio = new Audio(fullUrl);
+    audio.onended = () => setIsPlaying(false);
+    audio.play().catch(err => {
+        console.error("Playback failed:", err);
+        alert("Could not play the recording. Please try again.");
+    });
+    
+    setAudioInstance(audio);
+    setIsPlaying(true);
+  };
 
   if (!mounted) {
     return (
@@ -364,7 +394,35 @@ export default function ResultsPage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {data.audio_url && (
+                <button
+                  onClick={handleToggleAudio}
+                  className={`flex items-center gap-3 rounded-full border px-6 py-3 text-sm font-black transition-all active:scale-95 ${
+                    isPlaying 
+                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]" 
+                    : "border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 shadow-lg"
+                  }`}
+                >
+                  {isPlaying ? (
+                    <>
+                      <Pause size={18} className="fill-current" />
+                      <span className="uppercase tracking-widest">Playing Recording</span>
+                      <span className="flex gap-0.5">
+                        <span className="h-3 w-1 animate-bounce bg-emerald-400 rounded-full" style={{ animationDelay: '0s' }}></span>
+                        <span className="h-4 w-1 animate-bounce bg-emerald-400 rounded-full" style={{ animationDelay: '0.1s' }}></span>
+                        <span className="h-3 w-1 animate-bounce bg-emerald-400 rounded-full" style={{ animationDelay: '0.2s' }}></span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={18} className="fill-current" />
+                      <span className="uppercase tracking-widest">Listen to Your Recording</span>
+                    </>
+                  )}
+                </button>
+              )}
+
               <button
                 onClick={() => router.push("/")}
                 className="rounded-full border border-slate-700 bg-[#131A2A] px-5 py-3 text-sm font-bold text-slate-200 transition hover:bg-[#1B2438]"
