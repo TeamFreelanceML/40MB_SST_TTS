@@ -109,7 +109,10 @@ export interface SherpaHookResult {
  * useSherpa — Neural STT engine using Sherpa-ONNX WebAssembly.
  * Handles Fast Refresh resiliency and real-time word highlighting.
  */
-export function useSherpa(story: Story | null): SherpaHookResult {
+export function useSherpa(
+  story: Story,
+  setStory: (story: Story) => void,
+): SherpaHookResult {
   const [status, setStatus] = useState<SherpaStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("Idle");
   const [downloadProgress, setDownloadProgress] = useState(0);

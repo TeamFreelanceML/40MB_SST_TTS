@@ -24,7 +24,7 @@ type PausePrompt = "continue" | "still-recording" | null;
 
 export default function ReadingApp() {
   const router = useRouter();
-  const [story] = useState<Story>(() => parseStory(STORY_TEXT, STORY_TITLE));
+  const [story, setStory] = useState<Story>(() => parseStory(STORY_TEXT, STORY_TITLE));
   const helperSkippedWordsRef = useRef<Array<{ expected_index: number; word: string }>>([]);
   const expectedIndexByWordId = useMemo(() => {
     const map = new Map<string, number>();
@@ -34,7 +34,17 @@ export default function ReadingApp() {
     return map;
   }, [story]);
   
-  const { status, statusMessage, downloadProgress, start: startSherpa, stop: stopSherpa, cursor, correctCount, recognizedText, advanceManual } = useSherpa(story);
+  const { 
+    status, 
+    statusMessage, 
+    downloadProgress, 
+    start: startSherpa, 
+    stop: stopSherpa, 
+    cursor, 
+    correctCount, 
+    recognizedText, 
+    advanceManual 
+  } = useSherpa(story, setStory);
   const { isRecording, startRecording, stopRecording } = useAudioRecorder();
   const { isEvaluating, result, evaluateReading } = useEvaluation();
 
