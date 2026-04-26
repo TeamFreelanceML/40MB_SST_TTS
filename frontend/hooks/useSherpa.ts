@@ -358,34 +358,30 @@ export function useSherpa(
       if (!targetWord) break;
 
       const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
-      const distance = levenshteinDistance(token, normalizedTarget);
-      
-      // LOOSE MATCHING (V9.0)
-      if (token === normalizedTarget || distance <= 2) {
+      const dist = levenshteinDistance(token, normalizedTarget);
+
+      // [V15.0 AUDIT FIX] Higher sensitivity for whispers/fast reading (Dist 2)
+      if (token === normalizedTarget || dist <= 2) {
         targetWord.status = "correct";
         lastMatchedIndexRef.current = searchIdx;
         matchesFound++;
-
+        
         const next = advanceCursor(curStory, activeCursor);
         if (next) {
-          const nextWord = getWordAtCursor(curStory, next);
-          if (nextWord) {
-            nextWord.status = "active";
             activeCursor = next;
-          }
+            const nextWord = getWordAtCursor(curStory, activeCursor);
+            if (nextWord) nextWord.status = "active";
         } else {
-          activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-          break;
+            // End of story reached
+            activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
         }
+        searchIdx++;
       } else {
-        // [V14.0 TRIPLE-ANCHOR JUMP]
-        // We look ahead up to 10 words. 
-        // We ONLY jump if we hear 3 words in a row OR a very unique word (>7 chars).
+        // [V15.0 AUDIT FIX]
+        // Triple-Anchor is for duplicates. Long words or End-of-Sentence jump immediately.
         let jumpFound = false;
         let jumpCursor = { ...activeCursor };
         
-        const hasMomentum = matchesFound > 0;
-
         for (let j = 0; j < 10; j++) {
             const nextCand = advanceCursor(curStory, jumpCursor);
             if (!nextCand) break;
@@ -397,33 +393,30 @@ export function useSherpa(
             const normAhead = normalizeWord(aheadWord.text).toLowerCase();
             const distAhead = levenshteinDistance(token, normAhead);
             
-            // Strict jump matching
             if (token === normAhead || distAhead <= 1) {
-                // Check for 3-word sequence or 1 long word
-                const t2 = allTokens[searchIdx + 1];
-                const t3 = allTokens[searchIdx + 2];
+                // Determine if this jump is "Safe"
+                const followingCand = advanceCursor(curStory, jumpCursor);
+                const followingWord = followingCand ? getWordAtCursor(curStory, followingCand) : null;
                 
-                const c2 = advanceCursor(curStory, jumpCursor);
-                const w2 = c2 ? getWordAtCursor(curStory, c2) : null;
-                const n2 = w2 ? normalizeWord(w2.text).toLowerCase() : null;
+                // JUMP RULES:
+                // 1. If it's a long word (>5 chars) -> JUMP.
+                // 2. If it's the last word in a sentence -> JUMP.
+                // 3. If there's a sequence after it -> JUMP.
+                const isLong = normAhead.length > 5;
+                const isEndOfSentence = !followingWord || (followingCand && followingCand.sentenceIndex !== jumpCursor.sentenceIndex);
                 
-                const c3 = c2 ? advanceCursor(curStory, c2) : null;
-                const w3 = c3 ? getWordAtCursor(curStory, c3) : null;
-                const n3 = w3 ? normalizeWord(w3.text).toLowerCase() : null;
+                let isSequence = false;
+                if (followingWord) {
+                    const t2 = allTokens[searchIdx + 1];
+                    const n2 = normalizeWord(followingWord.text).toLowerCase();
+                    if (t2 && (t2 === n2 || levenshteinDistance(t2, n2) <= 1)) isSequence = true;
+                }
 
-                const isTriple = (t2 && n2 && (t2 === n2 || levenshteinDistance(t2, n2) <= 1)) &&
-                                 (t3 && n3 && (t3 === n3 || levenshteinDistance(t3, n3) <= 1));
-                
-                const isLong = normAhead.length >= 7;
-
-                if (isTriple || isLong || (hasMomentum && normAhead.length > 3)) {
+                if (isLong || isEndOfSentence || isSequence) {
                     let catchupPtr = activeCursor;
                     while (catchupPtr && (catchupPtr.wordIndex !== jumpCursor.wordIndex || catchupPtr.chunkIndex !== jumpCursor.chunkIndex)) {
                         const skipWord = getWordAtCursor(curStory, catchupPtr);
-                        if (skipWord) {
-                            // [V11.2 Grace Rule] Single missed word is Green.
-                            skipWord.status = "correct"; 
-                        }
+                        if (skipWord) skipWord.status = "correct"; // Grace rule
                         catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
                     }
                     
