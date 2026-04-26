@@ -177,43 +177,13 @@ body {
   text-decoration-thickness: 2px;
 }
 
-/* Skipped word — Now unified with correct color to stay positive */
-.word-skipped {
-  color: var(--accent-emerald);
-  opacity: 0.8;
-}
-
-/* Wrong word */
-.word-wrong {
+/* Skipped and error words all use the Red Stripe style */
+.word-skipped, .word-wrong, .word-extra, .word-repeated, .word-unclear {
   color: var(--accent-rose);
-  text-decoration-line: underline;
-  text-decoration-style: wavy;
+  text-decoration: line-through;
   text-decoration-color: var(--accent-rose);
-  text-underline-offset: 4px;
-}
-
-/* Extra word */
-.word-extra {
-  color: var(--accent-sky);
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.2);
-  border-radius: 4px;
-  padding: 0 4px;
-}
-
-/* Repeated word */
-.word-repeated {
-  color: var(--accent-amber);
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  border-radius: 4px;
-  padding: 0 4px;
-}
-
-/* Unclear audio */
-.word-unclear {
-  color: #a78bfa; /* Violet 400 */
-  border-bottom: 2px dotted #a78bfa;
+  text-decoration-thickness: 2px;
+  opacity: 0.7;
 }
 
 /* Pending word — visible but waiting */

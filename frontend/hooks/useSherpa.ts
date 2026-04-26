@@ -345,10 +345,11 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         
         // --- BALANCED TOLERANCE LOGIC ---
         // Allow 1 mistake for all words >= 2 letters. 
-        // This is the "Sweet Spot" for high-accuracy reading coaches.
         const distance = levenshteinDistance(token, normalizedTarget);
         const isExact = token === normalizedTarget;
-        const isFuzzy = normalizedTarget.length >= 2 && distance <= 1;
+        // [V7.0 REDUCED STRICTNESS] 
+        // Allow 1 error for any word, 2 errors for long words (6+ chars)
+        const isFuzzy = distance <= 1 || (normalizedTarget.length >= 6 && distance <= 2);
 
         if (isExact || isFuzzy) {
             targetWord.status = "correct";
@@ -386,39 +387,34 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 const normAhead = normalizeWord(aheadWord.text).toLowerCase();
                 const distAhead = levenshteinDistance(token, normAhead);
                 
-                // Use the same Balanced Tolerance for lookahead
-                if (token === normAhead || (normAhead.length >= 2 && distAhead <= 1)) {
-                    // Match found! Marks all intermediate words as skipped.
-                    let skipSweep: ReadingCursor | null = { ...activeCursor };
-                    while (skipSweep && (skipSweep.wordIndex !== lookaheadCursor.wordIndex || skipSweep.sentenceIndex !== lookaheadCursor.sentenceIndex)) {
-                        const skipWord = getWordAtCursor(curStory, skipSweep);
-                        if (skipWord) skipWord.status = "skipped";
-                        const nextSweep: ReadingCursor | null = advanceCursor(curStory, skipSweep);
-                        if (!nextSweep) break;
-                        skipSweep = nextSweep;
-                    }
+                // Use the same Reduced Strictness for lookahead
+                if (token === normAhead || distAhead <= 1 || (normAhead.length >= 6 && distAhead <= 2)) {
+                // Match found! 
+                // [V6.0 FIX] STOP marking intermediate words as skipped automatically.
+                // This was causing "Correct" words to turn red if the engine jumped ahead.
+                // We now just move the cursor to the match.
+                
+                aheadWord.status = "correct";
+                correctCountRef.current++;
+                setCorrectCount(correctCountRef.current);
 
-                    aheadWord.status = "correct";
-                    correctCountRef.current++;
-                    setCorrectCount(correctCountRef.current);
-
-                    const finalNext = advanceCursor(curStory, lookaheadCursor);
-                    if (finalNext) {
-                        const finalNextWord = getWordAtCursor(curStory, finalNext);
-                        if (finalNextWord) {
-                            finalNextWord.status = "active";
-                            activeCursor = finalNext; 
-                        }
-                    } else {
-                      activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-                      setStatus("ready");
+                const finalNext = advanceCursor(curStory, lookaheadCursor);
+                if (finalNext) {
+                    const finalNextWord = getWordAtCursor(curStory, finalNext);
+                    if (finalNextWord) {
+                        finalNextWord.status = "active";
+                        activeCursor = finalNext; 
                     }
-                    
-                    setCursor(activeCursor);
-                    cursorRef.current = activeCursor;
-                    await new Promise(r => setTimeout(r, 60));
-                    foundMatch = true;
-                    break;
+                } else {
+                    activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+                    setStatus("ready");
+                }
+                
+                setCursor(activeCursor);
+                cursorRef.current = activeCursor;
+                await new Promise(r => setTimeout(r, 60));
+                foundMatch = true;
+                break;
                 }
             }
             if (foundMatch) continue;
