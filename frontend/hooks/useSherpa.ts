@@ -398,14 +398,28 @@ export function useSherpa(
                                     (nextToken && normFollowing && (nextToken === normFollowing || levenshteinDistance(nextToken, normFollowing) <= 1));
 
                 if (isConfirmed) {
+                    // [V11.2 KIND-READING ENGINE]
+                    // We only mark words as Red (Skipped) if you skip a LARGE chunk.
+                    // If it's just one word or small words, we turn them Green (Grace).
                     let catchupPtr = activeCursor;
+                    let skipList: any[] = [];
                     while (catchupPtr && (catchupPtr.wordIndex !== jumpCursor.wordIndex || catchupPtr.chunkIndex !== jumpCursor.chunkIndex)) {
                         const skipWord = getWordAtCursor(curStory, catchupPtr);
-                        if (skipWord) {
-                            skipWord.status = "skipped"; 
-                        }
+                        if (skipWord) skipList.push({ word: skipWord, ptr: { ...catchupPtr } });
                         catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
                     }
+
+                    const actualSkips = skipList.filter(s => s.word.text.length > 3);
+                    
+                    skipList.forEach(s => {
+                        // GRACE RULE: If it's only 1 long word being skipped, turn it Green.
+                        // If it's multiple long words, turn them Red.
+                        if (actualSkips.length <= 1 || s.word.text.length <= 3) {
+                            s.word.status = "correct";
+                        } else {
+                            s.word.status = "skipped";
+                        }
+                    });
                     
                     aheadWord.status = "correct";
                     lastMatchedIndexRef.current = searchIdx;
