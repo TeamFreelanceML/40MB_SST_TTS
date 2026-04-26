@@ -347,9 +347,10 @@ export function useSherpa(story: Story | null): SherpaHookResult {
         // Allow 1 mistake for all words >= 2 letters. 
         const distance = levenshteinDistance(token, normalizedTarget);
         const isExact = token === normalizedTarget;
-        // [V7.0 REDUCED STRICTNESS] 
-        // Allow 1 error for any word, 2 errors for long words (6+ chars)
-        const isFuzzy = distance <= 1 || (normalizedTarget.length >= 6 && distance <= 2);
+        // [V7.1 REFINED STRICTNESS]
+        // Exact match is always allowed.
+        // Fuzzy (1-2 errors) only allowed for words longer than 3 characters.
+        const isFuzzy = normalizedTarget.length > 3 && (distance <= 1 || (normalizedTarget.length >= 6 && distance <= 2));
 
         if (isExact || isFuzzy) {
             targetWord.status = "correct";
@@ -387,8 +388,8 @@ export function useSherpa(story: Story | null): SherpaHookResult {
                 const normAhead = normalizeWord(aheadWord.text).toLowerCase();
                 const distAhead = levenshteinDistance(token, normAhead);
                 
-                // Use the same Reduced Strictness for lookahead
-                if (token === normAhead || distAhead <= 1 || (normAhead.length >= 6 && distAhead <= 2)) {
+                // Use the same Refined Strictness for lookahead
+                if (token === normAhead || (normAhead.length > 3 && (distAhead <= 1 || (normAhead.length >= 6 && distAhead <= 2)))) {
                 // Match found! 
                 // [V6.0 FIX] STOP marking intermediate words as skipped automatically.
                 // This was causing "Correct" words to turn red if the engine jumped ahead.
@@ -438,9 +439,9 @@ export function useSherpa(story: Story | null): SherpaHookResult {
     // in the current speech result. This is immune to the "Say it Twice" correction bug.
     const searchFrom = lastMatchedIndexRef.current + 1;
     
-    // We only look at the "Leading Edge" (the last 3 words) to prevent random chatter 
-    // from matching words we haven't read yet.
-    const frontier = allTokens.slice(Math.max(searchFrom, allTokens.length - 3));
+    // We only look at the "Leading Edge" (the last 2 words) to focus on the student's 
+    // current voice and ignore unwanted background chatter.
+    const frontier = allTokens.slice(Math.max(searchFrom, allTokens.length - 2));
 
     if (frontier.length > 0) {
         // Find the FIRST word in the frontier that hasn't been queued

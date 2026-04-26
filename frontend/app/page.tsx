@@ -435,11 +435,7 @@ export default function ReadingApp() {
     <main className="min-h-screen bg-[#0B0F19] text-slate-200 font-sans flex flex-col relative pb-32">
       <style>{`
         .word-active {
-          background-color: rgba(99, 102, 241, 0.2) !important;
-          border: 1px solid rgba(129, 140, 248, 0.8) !important;
-          border-radius: 0.375rem !important;
-          padding: 2px 4px !important;
-          box-shadow: 0 0 10px rgba(99,102,241,0.5) !important;
+          /* No special box highlight - keep it clean */
           color: white !important;
         }
         .word-correct {

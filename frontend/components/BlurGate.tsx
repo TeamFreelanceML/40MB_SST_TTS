@@ -69,8 +69,8 @@ function getChunkStyles(isActive: boolean): React.CSSProperties {
     display: "inline",
     padding: "0.18rem 0.28rem",
     borderRadius: "0.5rem",
-    background: isActive ? "linear-gradient(135deg, rgba(59,130,246,0.22), rgba(99,102,241,0.16))" : "transparent",
-    boxShadow: isActive ? "0 0 0 1px rgba(96,165,250,0.28), 0 10px 24px rgba(37,99,235,0.14)" : "none",
+    background: "transparent",
+    boxShadow: "none",
     transition:
       "background 220ms ease, box-shadow 220ms ease, transform 220ms ease, opacity 220ms ease",
   };
