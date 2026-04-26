@@ -373,11 +373,11 @@ export function useSherpa(story: Story | null): SherpaHookResult {
             cursorRef.current = activeCursor;
             await new Promise(r => setTimeout(r, 60));
         } else {
-            // [V5.8 BALANCED LOOKAHEAD]
+            // [V7.2 ULTRA-TIGHT LOOKAHEAD]
+            // We only look ahead at the next 2 words to ignore background noise.
             let lookaheadCursor: ReadingCursor | null = { ...activeCursor };
             let foundMatch = false;
-
-            for (let j = 0; j < 3; j++) {
+            for (let j = 0; j < 2; j++) {
                 const nextCandidate = advanceCursor(curStory, lookaheadCursor as ReadingCursor);
                 if (!nextCandidate) break;
                 lookaheadCursor = nextCandidate;
@@ -439,9 +439,9 @@ export function useSherpa(story: Story | null): SherpaHookResult {
     // in the current speech result. This is immune to the "Say it Twice" correction bug.
     const searchFrom = lastMatchedIndexRef.current + 1;
     
-    // We only look at the "Leading Edge" (the last 2 words) to focus on the student's 
-    // current voice and ignore unwanted background chatter.
-    const frontier = allTokens.slice(Math.max(searchFrom, allTokens.length - 2));
+    // We only look at the "Leading Edge" (the very last word heard) to focus 
+    // exclusively on the student's current voice.
+    const frontier = allTokens.slice(Math.max(searchFrom, allTokens.length - 1));
 
     if (frontier.length > 0) {
         // Find the FIRST word in the frontier that hasn't been queued
@@ -579,6 +579,17 @@ export function useSherpa(story: Story | null): SherpaHookResult {
       processor.onaudioprocess = (e) => {
         if (statusRef.current !== "listening" || !recognizerRef.current) return;
         const inputData = e.inputBuffer.getChannelData(0);
+
+        // [V7.2 NEURAL NOISE GATE] Calculate RMS Volume
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) {
+          sum += inputData[i] * inputData[i];
+        }
+        const rms = Math.sqrt(sum / inputData.length);
+        
+        // If volume is too low (silent student + background chatter), 
+        // ignore the audio completely. 0.008 is a safe threshold.
+        if (rms < 0.008) return; 
 
         // [V5.1 CRITICAL FIX] Use the ACTUAL Context Sample Rate
         // Some browsers ignore the 16000 request and use 48000. 
