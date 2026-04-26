@@ -332,14 +332,29 @@ export function useSherpa(
   // It is immune to background noise because it can 'skip' over random words.
   const scanForMatches = useCallback((allTokens: string[]) => {
     if (!storyRef.current) return;
+    
+    // [V12.0 MEMORY GUARD]
+    // If the engine reset its buffer, we must reset our search index.
+    if (lastMatchedIndexRef.current >= allTokens.length) {
+      lastMatchedIndexRef.current = -1;
+    }
+
     const curStory = JSON.parse(JSON.stringify(storyRef.current));
     let activeCursor = { ...cursorRef.current };
     let matchesFound = 0;
 
     // We start searching from the last word we correctly identified.
+    // [V12.0 SLIDING WINDOW]
+    // If no match is found from the current position, we scan from the beginning (index 0).
     let searchIdx = lastMatchedIndexRef.current + 1;
+    let fallbackUsed = false;
 
-    while (searchIdx < allTokens.length) {
+    while (searchIdx < allTokens.length || (!fallbackUsed && searchIdx >= allTokens.length)) {
+      if (searchIdx >= allTokens.length) {
+        searchIdx = 0;
+        fallbackUsed = true;
+      }
+
       const token = allTokens[searchIdx];
       const targetWord = getWordAtCursor(curStory, activeCursor);
       if (!targetWord) break;
