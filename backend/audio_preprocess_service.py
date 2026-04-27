@@ -8,14 +8,14 @@ logger = logging.getLogger("AIJudge.AudioPreprocess")
 
 
 def trim_trailing_silence(audio_path: str) -> str:
-    """Trim only trailing silence while preserving the original speech timing."""
     trimmed_path = tempfile.NamedTemporaryFile(delete=False, suffix=".webm").name
+    actual_trimmed_path = trimmed_path # Default fallback
 
-    # V3.0 SUPER-CLEAN Filter Chain:
-    # 1. afftdn: Stronger FFT-based noise reduction (nr=22 for music removal)
-    # 2. highpass: Removes low frequency rumble (< 200Hz)
-    # 3. lowpass: Removes high frequency static (> 12kHz)
-    # 4. agate: Aggressive noise gate to silence background music during silence
+    # V4.0 STUDIO-GRADE Filter Chain:
+    # 1. anlmdn: Arnold Non-Local Means Denoiser (Superior for music/complex noise)
+    # 2. highpass/lowpass: Bandpass filter strictly for human voice range (300Hz - 8kHz)
+    # 3. agate: Aggressive gate to kill music in gaps
+    # 4. compand: Normalizes voice to professional levels
     # 5. areverse -> silenceremove -> areverse: Trims trailing silence
     ffmpeg_cmd = [
         "ffmpeg",
@@ -23,11 +23,20 @@ def trim_trailing_silence(audio_path: str) -> str:
         "-i",
         audio_path,
         "-af",
-        "afftdn=nr=22:nf=-20,highpass=f=200,lowpass=f=12000,agate=threshold=-32dB:ratio=2:attack=5:release=50,areverse,silenceremove=start_periods=1:start_silence=0.5:start_threshold=-45dB,areverse",
+        (
+            "anlmdn=s=7:p=0.002:r=0.002,highpass=f=300,lowpass=f=8000,"
+            "agate=threshold=-24dB:ratio=5:attack=2:release=100,"
+            "compand=attacks=0:points=-80/-80|-24/-12|0/-6|20/-6,"
+            "areverse,silenceremove=start_periods=1:start_silence=0.5:start_threshold=-40dB,areverse"
+        ),
         "-c:a",
-        "libopus",
-        trimmed_path,
+        "pcm_s16le", # Using WAV format for better internal processing
+        "-ar",
+        "16000",
+        trimmed_path.replace(".webm", ".wav"),
     ]
+    # Update path to WAV for the return
+    actual_trimmed_path = trimmed_path.replace(".webm", ".wav")
 
     try:
         logger.info("[PHASE 0.5] Trimming trailing silence before transcription...")
@@ -39,24 +48,24 @@ def trim_trailing_silence(audio_path: str) -> str:
         )
 
         if completed.returncode != 0:
-            logger.warning("[PHASE 0.5] Trailing silence trim failed. Falling back to original audio.")
+            logger.warning("[PHASE 0.5] Studio-Grade cleanup failed. Falling back to original audio.")
             logger.warning(completed.stderr.strip())
-            if os.path.exists(trimmed_path):
-                os.remove(trimmed_path)
+            if os.path.exists(actual_trimmed_path):
+                os.remove(actual_trimmed_path)
             return audio_path
 
-        if not os.path.exists(trimmed_path) or os.path.getsize(trimmed_path) == 0:
-            logger.warning("[PHASE 0.5] Trimmed file invalid. Falling back to original audio.")
-            if os.path.exists(trimmed_path):
-                os.remove(trimmed_path)
+        if not os.path.exists(actual_trimmed_path) or os.path.getsize(actual_trimmed_path) == 0:
+            logger.warning("[PHASE 0.5] Cleaned file invalid. Falling back to original audio.")
+            if os.path.exists(actual_trimmed_path):
+                os.remove(actual_trimmed_path)
             return audio_path
 
-        logger.info("[PHASE 0.5] Trailing silence trimmed successfully.")
-        return trimmed_path
+        logger.info("[PHASE 0.5] Audio cleaned and trailing silence trimmed successfully.")
+        return actual_trimmed_path
     except Exception as exc:
-        logger.warning(f"[PHASE 0.5] Trailing silence trim errored: {exc}. Falling back to original audio.")
-        if os.path.exists(trimmed_path):
-            os.remove(trimmed_path)
+        logger.warning(f"[PHASE 0.5] Audio cleanup errored: {exc}. Falling back to original audio.")
+        if os.path.exists(actual_trimmed_path):
+            os.remove(actual_trimmed_path)
         return audio_path
 
 
