@@ -330,141 +330,64 @@ export function useSherpa(
   // This engine scans the recent transcript to find matches.
   // It is immune to background noise because it can 'skip' over random words.
   const scanForMatches = useCallback((allTokens: string[]) => {
-    if (!storyRef.current) return;
+    if (!storyRef.current || allTokens.length === 0) return;
     
-    // [V14.0 MEMORY GUARD]
-    if (lastMatchedIndexRef.current >= allTokens.length) {
-      lastMatchedIndexRef.current = -1;
-    }
+    // GOLD STANDARD: Focus only on the last token spoken
+    const lastToken = normalizeWord(allTokens[allTokens.length - 1]).toLowerCase();
+    if (!lastToken) return;
 
     const curStory = { ...storyRef.current };
     let activeCursor = { ...cursorRef.current };
-    let matchesFound = 0;
+    let matchFound = false;
 
-    // We start searching from the last word we correctly identified.
-    // [V12.0 SLIDING WINDOW]
-    // If no match is found from the current position, we scan from the beginning (index 0).
-    let searchIdx = lastMatchedIndexRef.current + 1;
-    let fallbackUsed = false;
+    // GOLD STANDARD: Search only 5 words ahead from the current cursor.
+    let searchCursor = { ...activeCursor };
+    
+    for (let i = 0; i < 5; i++) {
+        const targetWord = getWordAtCursor(curStory, searchCursor);
+        if (!targetWord) break;
 
-    while (searchIdx < allTokens.length || (!fallbackUsed && searchIdx >= allTokens.length)) {
-      if (searchIdx >= allTokens.length) {
-        searchIdx = 0;
-        fallbackUsed = true;
-      }
-
-      const token = allTokens[searchIdx];
-      const targetWord = getWordAtCursor(curStory, activeCursor);
-      if (!targetWord) break;
-
-      const normalizedTarget = normalizeWord(targetWord.text).toLowerCase();
-      const dist = levenshteinDistance(token, normalizedTarget);
-
-      // [V18.0] Max sensitivity (Dist 3) to prevent repeating words
-      if (token === normalizedTarget || dist <= 3) {
-        targetWord.status = "correct";
-        lastMatchedIndexRef.current = searchIdx;
-        matchesFound++;
+        const normTarget = normalizeWord(targetWord.text).toLowerCase();
         
-        const next = advanceCursor(curStory, activeCursor);
-        if (next) {
-            activeCursor = next;
-            const nextWord = getWordAtCursor(curStory, activeCursor);
-            if (nextWord) nextWord.status = "active";
-        } else {
-            activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-        }
-        searchIdx++;
-      } else {
-        // [V15.0 AUDIT FIX]
-        // Triple-Anchor is for duplicates. Long words or End-of-Sentence jump immediately.
-        let jumpFound = false;
-        let jumpCursor = { ...activeCursor };
-        
-        for (let j = 0; j < 10; j++) {
-            const nextCand = advanceCursor(curStory, jumpCursor);
-            if (!nextCand) break;
-            jumpCursor = nextCand;
-            
-            const aheadWord = getWordAtCursor(curStory, jumpCursor);
-            if (!aheadWord) break;
-            
-            const normAhead = normalizeWord(aheadWord.text).toLowerCase();
-            const distAhead = levenshteinDistance(token, normAhead);
-            
-            if (token === normAhead || distAhead <= 1) {
-                // Determine if this jump is "Safe"
-                const followingCand = advanceCursor(curStory, jumpCursor);
-                const followingWord = followingCand ? getWordAtCursor(curStory, followingCand) : null;
-                
-                // [V18.0 BULLETPROOF JUMP RULES]
-                const isLong = normAhead.length > 5;
-                const isEndOfSentence = !followingWord || (followingCand && followingCand.sentenceIndex !== jumpCursor.sentenceIndex);
-                const isSameSentence = jumpCursor.sentenceIndex === activeCursor.sentenceIndex;
-                
-                let isSequence = false;
-                if (followingWord) {
-                    const t2 = allTokens[searchIdx + 1];
-                    const n2 = normalizeWord(followingWord.text).toLowerCase();
-                    if (t2 && (t2 === n2 || levenshteinDistance(t2, n2) <= 1)) isSequence = true;
-                }
+        // Strict Matching: Exact for small words, 1-char distance for long words
+        const dist = levenshteinDistance(lastToken, normTarget);
+        const isMatch = normTarget.length <= 3 ? (lastToken === normTarget) : (dist <= 1);
 
-                // RULE: Jumps between sentences ALWAYS require a sequence.
-                // Jumps within the same sentence allow long words or end-of-sentence.
-                const isConfirmed = isSequence || (isSameSentence && (isLong || isEndOfSentence));
-
-                if (isConfirmed) {
-                    let catchupPtr = activeCursor;
-                    let skipCount = 0;
-                    let skippedWords: any[] = [];
-                    
-                    while (catchupPtr && (catchupPtr.wordIndex !== jumpCursor.wordIndex || catchupPtr.chunkIndex !== jumpCursor.chunkIndex)) {
-                        const skipWord = getWordAtCursor(curStory, catchupPtr);
-                        if (skipWord) {
-                            skippedWords.push(skipWord);
-                            skipCount++;
-                        }
-                        catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
-                    }
-                    
-                    skippedWords.forEach(sw => {
-                        // SkipCount > 1 is Red Strip. SkipCount 1 is Grace Green.
-                        if (skipCount > 1 && sw.text.length > 3) sw.status = "skipped";
-                        else sw.status = "correct";
-                    });
-                    
-                    aheadWord.status = "correct";
-                    lastMatchedIndexRef.current = searchIdx;
-                    matchesFound++;
-                    
-                    const finalNext = advanceCursor(curStory, jumpCursor);
-                    if (finalNext) {
-                      const finalNextWord = getWordAtCursor(curStory, finalNext);
-                      if (finalNextWord) {
-                        finalNextWord.status = "active";
-                        activeCursor = finalNext;
-                      }
-                    } else {
-                      activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-                    }
-                    jumpFound = true;
-                    break;
-                }
+        if (isMatch) {
+            // Found a match! 
+            // Mark all words between previous cursor and here as correct (Grace).
+            let catchupPtr = activeCursor;
+            while (catchupPtr && (catchupPtr.wordIndex !== searchCursor.wordIndex || catchupPtr.chunkIndex !== searchCursor.chunkIndex || catchupPtr.sentenceIndex !== searchCursor.sentenceIndex)) {
+                const sw = getWordAtCursor(curStory, catchupPtr);
+                if (sw) sw.status = "correct";
+                catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
             }
+
+            targetWord.status = "correct";
+            correctCountRef.current++;
+            setCorrectCount(correctCountRef.current);
+            
+            // Move cursor to the NEXT word
+            const next = advanceCursor(curStory, searchCursor);
+            if (next) {
+                const nextWord = getWordAtCursor(curStory, next);
+                if (nextWord) nextWord.status = "active";
+                activeCursor = next;
+            } else {
+                activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+            }
+
+            matchFound = true;
+            break; 
         }
-        
-        if (!jumpFound) {
-            // If the current token doesn't match the current word OR a jump, 
-            // it's probably background noise. We move to the next token in the audio.
-            searchIdx++;
-            continue;
-        }
-      }
-      
-      searchIdx++;
+
+        // Move to next word for lookahead window
+        const nextInWindow = advanceCursor(curStory, searchCursor);
+        if (!nextInWindow) break;
+        searchCursor = nextInWindow;
     }
 
-    if (matchesFound > 0) {
+    if (matchFound) {
       setCursor(activeCursor);
       cursorRef.current = activeCursor;
       setStory(curStory);
