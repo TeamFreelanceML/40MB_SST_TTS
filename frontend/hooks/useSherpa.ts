@@ -269,9 +269,9 @@ export function useSherpa(
                       modelType: "zipformer",
                     },
                     endpointConfig: {
-                      rule1: { keepMaxFrames: 100, minUtteranceLength: 0.0, minSilenceTokenCount: 6 },
-                      rule2: { keepMaxFrames: 50, minUtteranceLength: 0.0, minSilenceTokenCount: 4 },
-                      rule3: { keepMaxFrames: 10, minUtteranceLength: 0.0, minSilenceTokenCount: 2 }
+                      rule1: { keepMaxFrames: 100, minUtteranceLength: 0.0, minSilenceTokenCount: 1 },
+                      rule2: { keepMaxFrames: 50, minUtteranceLength: 0.0, minSilenceTokenCount: 1 },
+                      rule3: { keepMaxFrames: 10, minUtteranceLength: 0.0, minSilenceTokenCount: 1 }
                     }
                   };
 
