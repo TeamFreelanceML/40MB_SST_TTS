@@ -357,9 +357,15 @@ export function useSherpa(
         const dist3 = lastThreeTokens ? levenshteinDistance(lastThreeTokens, normTarget) : 999;
         const minDist = Math.min(dist1, dist2, dist3);
         
+        // FAILSAFE: If this is the LAST word of the chunk, make it 300% more forgiving so they don't get stuck.
+        const targetChunk = curStory.paragraphs[searchCursor.paragraphIndex].sentences[searchCursor.sentenceIndex].chunks[searchCursor.chunkIndex];
+        const isLastWordOfChunk = searchCursor.wordIndex === targetChunk.words.length - 1;
+        
+        const allowedDistance = isLastWordOfChunk ? 3 : 1;
+
         const isMatch = normTarget.length <= 3 
-            ? (lastToken === normTarget || lastTwoTokens === normTarget || lastThreeTokens === normTarget) 
-            : (minDist <= 1);
+            ? (lastToken === normTarget || lastTwoTokens === normTarget || lastThreeTokens === normTarget || (isLastWordOfChunk && minDist <= 1)) 
+            : (minDist <= allowedDistance);
 
         if (isMatch) {
             // Found a match! 
