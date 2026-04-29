@@ -332,8 +332,10 @@ export function useSherpa(
   const scanForMatches = useCallback((allTokens: string[]) => {
     if (!storyRef.current || allTokens.length === 0) return;
     
-    // GOLD STANDARD: Focus only on the last token spoken
+    // GOLD STANDARD: Token Stitching for partial words
     const lastToken = normalizeWord(allTokens[allTokens.length - 1]).toLowerCase();
+    const lastTwoTokens = allTokens.length > 1 ? normalizeWord(allTokens[allTokens.length - 2] + allTokens[allTokens.length - 1]).toLowerCase() : "";
+    const lastThreeTokens = allTokens.length > 2 ? normalizeWord(allTokens[allTokens.length - 3] + allTokens[allTokens.length - 2] + allTokens[allTokens.length - 1]).toLowerCase() : "";
     if (!lastToken) return;
 
     const curStory = { ...storyRef.current };
@@ -349,9 +351,15 @@ export function useSherpa(
 
         const normTarget = normalizeWord(targetWord.text).toLowerCase();
         
-        // Strict Matching: Exact for small words, 1-char distance for long words
-        const dist = levenshteinDistance(lastToken, normTarget);
-        const isMatch = normTarget.length <= 3 ? (lastToken === normTarget) : (dist <= 1);
+        // Strict Matching: Check last 1, 2, or 3 tokens to fix partial word bugs ("mou" + "ntain")
+        const dist1 = levenshteinDistance(lastToken, normTarget);
+        const dist2 = lastTwoTokens ? levenshteinDistance(lastTwoTokens, normTarget) : 999;
+        const dist3 = lastThreeTokens ? levenshteinDistance(lastThreeTokens, normTarget) : 999;
+        const minDist = Math.min(dist1, dist2, dist3);
+        
+        const isMatch = normTarget.length <= 3 
+            ? (lastToken === normTarget || lastTwoTokens === normTarget || lastThreeTokens === normTarget) 
+            : (minDist <= 1);
 
         if (isMatch) {
             // Found a match! 

@@ -203,7 +203,7 @@ export default function ReadingApp() {
         promptStageRef.current = 0;
         
         if (finalBlob) {
-          evaluateReading(finalBlob, STORY_TEXT, helperSkippedWordsRef.current);
+          evaluateReading(finalBlob, STORY_TEXT, []); // Disable helper words for perfect Whisper accuracy
         }
     } catch (err) {
         console.error("Teardown error:", err);
@@ -216,7 +216,7 @@ export default function ReadingApp() {
       // [PRODUCTION BUGFIX] UNIFIED STREAM ACCESS
       // Capture the high-fidelity 48kHz stream once and share it.
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { channelCount: 1, sampleRate: 48000, echoCancellation: true } 
+        audio: { channelCount: 1, sampleRate: 48000, echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
       });
 
       // Pass the shared stream to both the STT engine and the Recorder
