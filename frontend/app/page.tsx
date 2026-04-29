@@ -216,7 +216,13 @@ export default function ReadingApp() {
       // [PRODUCTION BUGFIX] UNIFIED STREAM ACCESS
       // Capture the high-fidelity 48kHz stream once and share it.
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { channelCount: 1, sampleRate: 48000, echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+        audio: { 
+          channelCount: 1, 
+          sampleRate: 48000, 
+          echoCancellation: true, 
+          noiseSuppression: false, 
+          autoGainControl: false 
+        } 
       });
 
       // Pass the shared stream to both the STT engine and the Recorder
