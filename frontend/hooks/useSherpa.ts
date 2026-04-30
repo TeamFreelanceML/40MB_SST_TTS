@@ -523,15 +523,24 @@ export function useSherpa(
 
       const source = audioContext.createMediaStreamSource(rawMediaStreamRef.current);
       
-      // 2. Add a High-Pass Filter to remove low-frequency background hum
+      // 2. Add a High-Pass Filter to remove low-frequency background hum (Fan/AC)
       const filter = audioContext.createBiquadFilter();
       filter.type = "highpass";
-      filter.frequency.value = 200; // Cut everything below 200Hz (AC hum, traffic, etc)
+      filter.frequency.value = 100; // 100Hz is safer for children's voices while killing hum
+
+      // 3. Add a Dynamic Compressor to stabilize volume levels
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-24, audioContext.currentTime);
+      compressor.knee.setValueAtTime(40, audioContext.currentTime);
+      compressor.ratio.setValueAtTime(12, audioContext.currentTime);
+      compressor.attack.setValueAtTime(0, audioContext.currentTime);
+      compressor.release.setValueAtTime(0.25, audioContext.currentTime);
 
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
 
       source.connect(filter);
-      filter.connect(processor);
+      filter.connect(compressor);
+      compressor.connect(processor);
       processor.connect(audioContext.destination);
 
       const stream = recognizerRef.current.createStream();

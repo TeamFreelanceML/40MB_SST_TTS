@@ -25,7 +25,7 @@ def trim_trailing_silence(audio_path: str) -> str:
         audio_path,
         "-af",
         (
-            "afftdn=nr=10:nf=-20,highpass=f=80,lowpass=f=8000,"
+            "afftdn=nr=15:nf=-25,highpass=f=80,lowpass=f=8000,"
             "compand=attacks=0:points=-80/-80|-24/-12|0/-6|20/-6,"
             "areverse,silenceremove=start_periods=1:start_silence=0.5:start_threshold=-50dB,areverse"
         ),

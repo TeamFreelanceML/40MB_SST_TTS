@@ -98,7 +98,7 @@ async def evaluate_reading(
             logger.info(f"[PHASE 1] Entering Neural Transcription ({transcribe_size} bytes)...")
             try:
                 with timings.measure("transcribe_ms"):
-                    whisper_words = transcription_service.transcribe(transcribe_path)
+                    whisper_words = transcription_service.transcribe(transcribe_path, prompt=expected_text)
                 logger.info(f"[PHASE 1] Transcription Complete. {len(whisper_words)} words alignment detected.")
             except Exception as e:
                 logger.error(f"[PHASE 1] [CRITICAL] Whisper engine failed: {str(e)}")
