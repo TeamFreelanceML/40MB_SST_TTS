@@ -350,23 +350,21 @@ export function useSherpa(
     // GOLD STANDARD: Search only 5 words ahead from the current cursor.
     let searchCursor = { ...activeCursor };
     
-    for (let i = 0; i < 5; i++) {
+    // PRODUCTION HARDENING: Narrower window (2 words) to prevent "Jumping"
+    for (let i = 0; i < 2; i++) {
         const targetWord = getWordAtCursor(curStory, searchCursor);
         if (!targetWord) break;
 
         const normTarget = normalizeWord(targetWord.text).toLowerCase();
         
-        // Strict Matching: Check last 1, 2, or 3 tokens to fix partial word bugs ("mou" + "ntain")
         const dist1 = levenshteinDistance(lastToken, normTarget);
         const dist2 = lastTwoTokens ? levenshteinDistance(lastTwoTokens, normTarget) : 999;
         const dist3 = lastThreeTokens ? levenshteinDistance(lastThreeTokens, normTarget) : 999;
         const minDist = Math.min(dist1, dist2, dist3);
         
-        // FAILSAFE: If this is the LAST word of the chunk, make it 300% more forgiving so they don't get stuck.
         const targetChunk = curStory.paragraphs[searchCursor.paragraphIndex].sentences[searchCursor.sentenceIndex].chunks[searchCursor.chunkIndex];
         const isLastWordOfChunk = searchCursor.wordIndex === targetChunk.words.length - 1;
         
-        // Restore standard accuracy (1-letter tolerance)
         const allowedDistance = isLastWordOfChunk ? 3 : 1;
 
         const isMatch = normTarget.length <= 3 
@@ -375,14 +373,8 @@ export function useSherpa(
 
         if (isMatch) {
             // Found a match! 
-            // Mark all words between previous cursor and here as correct (Grace).
-            let catchupPtr = activeCursor;
-            while (catchupPtr && (catchupPtr.wordIndex !== searchCursor.wordIndex || catchupPtr.chunkIndex !== searchCursor.chunkIndex || catchupPtr.sentenceIndex !== searchCursor.sentenceIndex)) {
-                const sw = getWordAtCursor(curStory, catchupPtr);
-                if (sw) sw.status = "correct";
-                catchupPtr = advanceCursor(curStory, catchupPtr) as ReadingCursor;
-            }
-
+            // We NO LONGER mark intermediate words as correct automatically. 
+            // This stops the "Flash Jump" behavior.
             targetWord.status = "correct";
             correctCountRef.current++;
             setCorrectCount(correctCountRef.current);
