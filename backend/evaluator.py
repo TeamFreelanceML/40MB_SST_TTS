@@ -20,7 +20,10 @@ class ReadingEvaluator:
         ]
 
     def _normalize(self, text: str) -> str:
-        return re.sub(r"[^\w\s']", "", text.lower()).strip()
+        # PRODUCTION HARDENING: Strong English Filter (A-Z, a-z, 0-9, ', -)
+        # This is a secondary firewall against Russian hallucinations.
+        cleaned = re.sub(r"[^a-zA-Z0-9\s']", "", text.lower()).strip()
+        return cleaned
 
     def _get_similarity(self, a: str, b: str) -> float:
         return SequenceMatcher(None, self._normalize(a), self._normalize(b)).ratio()
@@ -40,6 +43,13 @@ class ReadingEvaluator:
 
         if expected_norm == spoken_norm:
             return "correct", 1.0
+
+        # [PRODUCTION HARDENING] BOUNDARY GRACE: Handle "trickled" vs "trickle"
+        # If the root is the same and we just added/removed a suffix, mark as correct.
+        suffixes = ("ed", "s", "ing", "d")
+        for sfx in suffixes:
+            if (expected_norm + sfx == spoken_norm) or (spoken_norm + sfx == expected_norm):
+                return "correct", 0.95
 
         if self._is_homophone_match(expected_word, spoken_word):
             return "acceptable_variant", similarity
@@ -466,8 +476,23 @@ class ReadingEvaluator:
                 "chunk_id": chunk_id,
             }
 
-            if self._get_similarity(self._normalize(spoken["word"]), last_claimed_word) >= 0.8:
-                repeated_words.append(detail)
+            # [PRODUCTION HARDENING] STUTTER FILTER
+            # Only count as a "Repeat" if the time gap is significant (> 0.4s).
+            # Otherwise, it was likely an AI glitch or a minor nervous stutter.
+            time_gap = 99.0
+            if whisper_idx > 0:
+                prev_spoken = filtered_whisper_words[whisper_idx - 1]
+                if "end" in prev_spoken and "start" in spoken:
+                    time_gap = spoken["start"] - prev_spoken["end"]
+
+            is_similar = self._get_similarity(self._normalize(spoken["word"]), last_claimed_word) >= 0.8
+            
+            if is_similar:
+                if time_gap > 0.4:
+                    repeated_words.append(detail)
+                else:
+                    # Instant repeat - Ignore to keep the report clean
+                    logger.info(f"[STUTTER] Auto-deleted instant repeat: {spoken['word']}")
             else:
                 extra_words.append(detail)
 

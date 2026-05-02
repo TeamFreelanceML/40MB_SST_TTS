@@ -236,7 +236,14 @@ export default function ReadingApp() {
       helperAdvanceRef.current = false;
       helperSkippedWordsRef.current = [];
       lastRecognizedAttemptRef.current = "";
-      resetIdleTracking("Great start. Read the glowing word first.");
+      
+      // PRODUCTION HARDENING: Ignition Countdown
+      setCoachMessage("Warming up... get ready!");
+      setTimeout(() => {
+        setCoachMessage("READY! GO! 🚀");
+        resetIdleTracking("Ready now! Read the glowing word.");
+      }, 1500);
+
     } catch (err) {
       console.error("Startup error:", err);
       setCoachMessage(`Microphone error: ${(err as Error).message}`);

@@ -139,6 +139,11 @@ export function useSherpa(
   const correctCountRef = useRef<number>(0);
   const lastResultRef = useRef<string>("");
   const statusRef = useRef(status);
+  
+  // Ignition Buffer: Ignore audio for first 1.5s to let WASM stabilize
+  const ignitionStartTimeRef = useRef<number | null>(null);
+  const IGNITION_DELAY_MS = 1500;
+
   const isMobileRef = useRef(false);
 
   // Sync refs with state
@@ -361,7 +366,9 @@ export function useSherpa(
         const targetChunk = curStory.paragraphs[searchCursor.paragraphIndex].sentences[searchCursor.sentenceIndex].chunks[searchCursor.chunkIndex];
         const isLastWordOfChunk = searchCursor.wordIndex === targetChunk.words.length - 1;
         
-        const allowedDistance = isLastWordOfChunk ? 3 : 1;
+        // [PRODUCTION HARDENING] Increase allowed distance to 2 for all words
+        // and 3 for the last word of a chunk to handle "trickle down" bleeding.
+        const allowedDistance = isLastWordOfChunk ? 3 : 2;
 
         const isMatch = normTarget.length <= 3 
             ? (lastToken === normTarget || lastTwoTokens === normTarget || lastThreeTokens === normTarget || (isLastWordOfChunk && minDist <= 1)) 
@@ -456,6 +463,7 @@ export function useSherpa(
     cursorRef.current = startCursor;
     correctCountRef.current = 0;
     setCorrectCount(0);
+    ignitionStartTimeRef.current = null;
   }, []);
 
   const advanceManual = useCallback((newStatus: "correct" | "skipped") => {
@@ -557,9 +565,16 @@ export function useSherpa(
         }
         const rms = Math.sqrt(sum / inputData.length);
         
+        // [PRODUCTION HARDENING] Ignition Logic
+        if (!ignitionStartTimeRef.current) {
+            ignitionStartTimeRef.current = Date.now();
+        }
+        if (Date.now() - ignitionStartTimeRef.current < IGNITION_DELAY_MS) {
+            return; // Ignore audio during warm-up
+        }
+
         // [V8.0 DYNAMIC HEARING]
         // If volume is extremely low, ignore. 
-        // We no longer clear lastResultRef to ensure continuous speech flow.
         if (rms < 0.003) return; 
 
         // [V5.1 CRITICAL FIX] Use the ACTUAL Context Sample Rate

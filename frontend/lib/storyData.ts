@@ -14,14 +14,14 @@ export interface StructuredStoryData {
 }
 
 export const structuredStory: StructuredStoryData = {
-  title: "Mother Bear in Spring",
+  title: "The Little Boat",
   paragraphs: [
     {
       id: "para_1",
       chunks: [
         {
           id: "para_1_chunk_1",
-          text: "It is the first warm day of spring. [...] A mother bear slowly peeks out of a hollow tree trunk [...] on the side of a quiet mountain. [...] She and her two cubs have slept all winter. [...] The cubs drank milk from their mother [...] but the mother bear ate nothing. [...] She is very hungry.",
+          text: "A small boat drifted slowly[...] across a quiet lake[...] as the morning sun rose gently[...] over the hills. [...] A young girl sat inside[...] holding the sides carefully[...] watching the water ripple[...] with every small movement.",
         },
       ],
     },
@@ -30,7 +30,7 @@ export const structuredStory: StructuredStoryData = {
       chunks: [
         {
           id: "para_2_chunk_1",
-          text: "The cubs blink in the bright sunlight [...] and tumble out of the tree behind her. [...] The snow is melting [...] and tiny streams of water trickle down the rocks. [...] The air smells fresh [...] and full of new life. [...] The mother bear listens carefully... [...] making sure the forest is safe.",
+          text: "After some time[...] the wind picked up slightly[...] and the boat began to move faster. [...] She felt a little afraid[...] but stayed calm[...] remembering what her father had taught her. [...] She adjusted her balance[...] and let the boat follow the flow[...] instead of fighting it.",
         },
       ],
     },
@@ -39,16 +39,7 @@ export const structuredStory: StructuredStoryData = {
       chunks: [
         {
           id: "para_3_chunk_1",
-          text: "She leads her cubs down the mountain path [...] toward a river she remembers. [...] Along the way she digs into the soft ground for roots [...] and turns over fallen logs to find insects. [...] The cubs watch her closely [...] learning how to search and how to survive.",
-        },
-      ],
-    },
-    {
-      id: "para_4",
-      chunks: [
-        {
-          id: "para_4_chunk_1",
-          text: "At last they reach the rushing river. [...] Silver fish swim beneath the clear water. [...] With a quick and powerful swipe [...] the mother bear catches one. [...] The cubs squeal with excitement [...] as she shares the meal. [...] Spring has begun [...] and their new season of life together is just starting.",
+          text: "Soon[...] the wind became gentle again[...] and the lake grew still. [...] The girl looked around[...] feeling proud and peaceful[...] as she guided the boat back to shore. [...] She stepped out slowly[...] knowing she had learned something new.",
         },
       ],
     },
