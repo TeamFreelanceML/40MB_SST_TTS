@@ -259,17 +259,17 @@ function getWordStyle(status: string) {
   switch (status) {
     case "correct":
     case "acceptable_variant":
-      return "word-correct bg-emerald-500/12 text-emerald-300 border border-emerald-500/20";
+      return "word-correct bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
     case "mispronounced":
-      return "word-wrong bg-red-500/12 text-red-300 border border-red-500/20";
+      return "word-wrong bg-pink-500/20 text-pink-300 border border-pink-500/30";
     case "skipped":
-      return "word-skipped bg-slate-700/40 text-slate-400 line-through border border-slate-600/40";
+      return "word-skipped bg-slate-800/60 text-slate-500 line-through border border-slate-700/50";
     case "extra":
-      return "word-extra bg-cyan-500/12 text-cyan-300 border border-cyan-500/20";
+      return "word-extra bg-sky-500/20 text-sky-300 border border-sky-500/30";
     case "repeated":
-      return "word-repeated bg-orange-500/12 text-orange-300 border border-orange-500/20";
+      return "word-repeated bg-amber-500/20 text-amber-300 border border-amber-500/30";
     case "unclear_audio":
-      return "word-unclear bg-violet-500/12 text-violet-300 border border-violet-500/20";
+      return "word-unclear bg-violet-500/20 text-violet-300 border border-violet-500/30";
     default:
       return "bg-slate-800/70 text-slate-200 border border-slate-700/50";
   }
@@ -508,11 +508,11 @@ export default function ResultsPage() {
           />
 
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
-            <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-emerald-300">Correct</span>
-            <span className="rounded-full border border-red-500/25 bg-red-500/10 px-3 py-1 text-red-300">Mispronounced</span>
-            <span className="rounded-full border border-slate-600/40 bg-slate-700/30 px-3 py-1 text-slate-300">Skipped</span>
-            <span className="rounded-full border border-cyan-500/25 bg-cyan-500/10 px-3 py-1 text-cyan-300">Extra</span>
-            <span className="rounded-full border border-orange-500/25 bg-orange-500/10 px-3 py-1 text-orange-300">Repeated</span>
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/20 px-3 py-1 text-emerald-300">Correct</span>
+            <span className="rounded-full border border-pink-500/30 bg-pink-500/20 px-3 py-1 text-pink-300">Mispronounced</span>
+            <span className="rounded-full border border-slate-700/50 bg-slate-800/60 px-3 py-1 text-slate-500">Skipped</span>
+            <span className="rounded-full border border-sky-500/30 bg-sky-500/20 px-3 py-1 text-sky-300">Extra</span>
+            <span className="rounded-full border border-amber-500/30 bg-amber-500/20 px-3 py-1 text-amber-300">Repeated</span>
           </div>
 
           <div className="mt-6 max-h-[980px] space-y-8 overflow-y-auto pr-2">
