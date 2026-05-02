@@ -1,6 +1,9 @@
 from difflib import SequenceMatcher
 import re
+import logging
 from typing import Any
+
+logger = logging.getLogger("AIJudge.Evaluator")
 
 
 class ReadingEvaluator:
