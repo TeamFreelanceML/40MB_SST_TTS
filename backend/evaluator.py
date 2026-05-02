@@ -469,23 +469,10 @@ class ReadingEvaluator:
                 "chunk_id": chunk_id,
             }
 
-            # [PRODUCTION HARDENING] STUTTER FILTER
-            # Only count as a "Repeat" if the time gap is significant (> 0.4s).
-            # Otherwise, it was likely an AI glitch or a minor nervous stutter.
-            time_gap = 99.0
-            if whisper_idx > 0:
-                prev_spoken = filtered_whisper_words[whisper_idx - 1]
-                if "end" in prev_spoken and "start" in spoken:
-                    time_gap = spoken["start"] - prev_spoken["end"]
-
             is_similar = self._get_similarity(self._normalize(spoken["word"]), last_claimed_word) >= 0.8
             
             if is_similar:
-                if time_gap > 0.4:
-                    repeated_words.append(detail)
-                else:
-                    # Instant repeat - Ignore to keep the report clean
-                    logger.info(f"[STUTTER] Auto-deleted instant repeat: {spoken['word']}")
+                repeated_words.append(detail)
             else:
                 extra_words.append(detail)
 
