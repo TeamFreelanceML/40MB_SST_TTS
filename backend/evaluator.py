@@ -23,10 +23,7 @@ class ReadingEvaluator:
         ]
 
     def _normalize(self, text: str) -> str:
-        # PRODUCTION HARDENING: Strong English Filter (A-Z, a-z, 0-9, ', -)
-        # This is a secondary firewall against Russian hallucinations.
-        cleaned = re.sub(r"[^a-zA-Z0-9\s']", "", text.lower()).strip()
-        return cleaned
+        return re.sub(r"[^\w\s']", "", text.lower()).strip()
 
     def _get_similarity(self, a: str, b: str) -> float:
         return SequenceMatcher(None, self._normalize(a), self._normalize(b)).ratio()
@@ -46,13 +43,6 @@ class ReadingEvaluator:
 
         if expected_norm == spoken_norm:
             return "correct", 1.0
-
-        # [PRODUCTION HARDENING] BOUNDARY GRACE: Handle "trickled" vs "trickle"
-        # If the root is the same and we just added/removed a suffix, mark as correct.
-        suffixes = ("ed", "s", "ing", "d")
-        for sfx in suffixes:
-            if (expected_norm + sfx == spoken_norm) or (spoken_norm + sfx == expected_norm):
-                return "correct", 0.95
 
         if self._is_homophone_match(expected_word, spoken_word):
             return "acceptable_variant", similarity

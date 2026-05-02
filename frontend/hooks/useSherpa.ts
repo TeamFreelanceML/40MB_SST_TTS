@@ -366,9 +366,8 @@ export function useSherpa(
         const targetChunk = curStory.paragraphs[searchCursor.paragraphIndex].sentences[searchCursor.sentenceIndex].chunks[searchCursor.chunkIndex];
         const isLastWordOfChunk = searchCursor.wordIndex === targetChunk.words.length - 1;
         
-        // [PRODUCTION HARDENING] Increase allowed distance to 2 for all words
-        // and 3 for the last word of a chunk to handle "trickle down" bleeding.
-        const allowedDistance = isLastWordOfChunk ? 3 : 2;
+        // Restore standard accuracy (1-letter tolerance)
+        const allowedDistance = isLastWordOfChunk ? 3 : 1;
 
         const isMatch = normTarget.length <= 3 
             ? (lastToken === normTarget || lastTwoTokens === normTarget || lastThreeTokens === normTarget || (isLastWordOfChunk && minDist <= 1)) 

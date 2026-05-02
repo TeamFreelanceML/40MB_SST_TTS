@@ -43,23 +43,25 @@ class WhisperEngine:
         logger.info(f"[*] Transcription finished in {elapsed:.1f}s")
 
         words = []
-        # English-Only Firewall: Allow A-Z, 0-9, spaces, and common punctuation
-        # This prevents Russian hallucinations like "ваш ответ" from appearing.
+        # [SURGICAL FIREWALL] Only block words that contain Russian/Cyrillic characters.
+        # This is 100% safe for English and will only kill the "Ghost Russian" words.
         import re
-        english_pattern = re.compile(r"^[a-zA-Z0-9\s'\-\.\,\!\?]+$")
+        cyrillic_pattern = re.compile(r'[\u0400-\u04FF]')
 
         for segment in result.get("segments", []):
             for word_info in segment.get("words", []):
                 clean_word = word_info["word"].strip()
-                # Only keep words that are purely English/standard characters
-                if english_pattern.match(clean_word):
-                    words.append({
-                        "word": clean_word,
-                        "start": word_info["start"],
-                        "end": word_info["end"],
-                        "probability": word_info.get("probability", 1.0)
-                    })
-                else:
-                    logger.warning(f"[FIREWALL] Blocked non-English hallucination: {clean_word}")
+                
+                # Check if the word contains any Russian letters
+                if cyrillic_pattern.search(clean_word):
+                    logger.warning(f"[FIREWALL] Blocked Russian hallucination: {clean_word}")
+                    continue
+
+                words.append({
+                    "word": clean_word,
+                    "start": word_info["start"],
+                    "end": word_info["end"],
+                    "probability": word_info.get("probability", 1.0)
+                })
 
         return words
