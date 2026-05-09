@@ -21,8 +21,13 @@ class Settings:
     AUDIO_CACHE_DIR: Path = BASE_DIR / "audio_cache"
 
     # TTS Engine Constants
+    # TTS Engine Timing (Strict Fluency Rules)
     INTER_CHUNK_MS: int = 450
-    INTER_PARA_MS: int = 1000
+    COMMA_PAUSE_MS: int = 500
+    DOT_PAUSE_MS:   int = 1000
+    PARA_PAUSE_MS:  int = 2000
+    
+    INTER_PARA_MS: int = PARA_PAUSE_MS
     MIN_WORD_DURATION_MS: int = 80
     FRAME_MS: int = 20  # Kokoro 24kHz frame size
 

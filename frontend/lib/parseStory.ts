@@ -29,41 +29,46 @@ export function normalizeWord(word: string): string {
  * Delimiters: commas, em-dashes, en-dashes, semicolons within sentence,
  * and coordinating conjunctions (and, but, or, so, yet) when preceded by a comma.
  */
-function splitIntoChunks(sentenceText: string): string[] {
-  // Split on comma-space, em-dash, en-dash, or comma + conjunction
-  const chunkDelimiter =
-    /,\s+|\s+—\s+|\s+–\s+|\s*"\s*(?=\S)|\s+"|\s+(?:and|but|or|so|yet)\s+/gi;
-
-  const chunks = sentenceText
-    .split(chunkDelimiter)
-    .map((c) => c.trim())
-    .filter((c) => c.length > 0);
-
-  // If no delimiters found, the whole sentence is one chunk
-  return chunks.length > 0 ? chunks : [sentenceText.trim()];
-}
-
-function splitByExplicitChunkDelimiter(paragraphText: string): string[] {
-  return paragraphText
-    .split(/\[\.\.\.\]/g)
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => chunk.length > 0);
-}
-
 /**
- * Split a paragraph string into sentence strings.
- * Splits on sentence-ending punctuation followed by whitespace.
+ * Split a paragraph into chunks using the exact same logic as the TTS engine.
+ * Delimiters: [c], [p], [...], punctuation (ignoring abbreviations).
  */
-function splitIntoSentences(paragraphText: string): string[] {
-  // Lookbehind for sentence-ending punctuation, followed by whitespace
-  const sentenceDelimiter = /(?<=[.!?])\s+/;
+function splitByUnifiedDelimiter(text: string): string[] {
+  // JavaScript Lookbehind support for abbreviations
+  const pattern = /(\[c\]|\[p\]|\[\.\.\.\]|(?<!\bMr|Mrs|Dr|Ms|Prof|St|vs)\.|,)/gi;
+  
+  const parts = text.split(pattern);
+  const chunks: string[] = [];
+  let currentChunk = "";
 
-  const sentences = paragraphText
-    .split(sentenceDelimiter)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part === undefined) continue;
 
-  return sentences;
+    if (pattern.test(part)) {
+      // It's a delimiter
+      if (part === "." || part === ",") {
+        currentChunk += part;
+        chunks.push(currentChunk.trim());
+        currentChunk = "";
+      } else {
+        // [c], [p], or [...]
+        if (currentChunk.trim()) {
+            chunks.push(currentChunk.trim());
+        }
+        currentChunk = "";
+      }
+    } else {
+      // It's content
+      currentChunk += part;
+    }
+  }
+  
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+
+  return chunks.filter(c => c.trim().length > 0);
 }
 
 function groupChunksIntoSentences(rawChunks: string[]): Array<{ text: string; chunks: string[] }> {
@@ -102,24 +107,19 @@ export function parseStory(text: string, title: string = "Story"): Story {
   let totalWords = 0;
   let totalChunks = 0;
 
-  // Split into paragraphs by blank lines
+  // Split into paragraphs by blank lines OR explicit [p] markers
   const rawParagraphs = text
-    .split(/\n\s*\n/)
+    .split(/\n\s*\n|\[p\]/)
     .map((p) => p.trim())
     .filter((p) => p.length > 0);
 
   const paragraphs: Paragraph[] = rawParagraphs.map(
     (rawParagraph, pIdx): Paragraph => {
-      const explicitChunks = rawParagraph.includes("[...]")
-        ? splitByExplicitChunkDelimiter(rawParagraph)
-        : null;
+      // Use the unified logic to get chunks
+      const explicitChunks = splitByUnifiedDelimiter(rawParagraph);
 
-      const sentenceInputs = explicitChunks
-        ? groupChunksIntoSentences(explicitChunks)
-        : splitIntoSentences(rawParagraph).map((rawSentence) => ({
-            text: rawSentence,
-            chunks: splitIntoChunks(rawSentence),
-          }));
+      // Group those chunks into sentences based on punctuation (.!?)
+      const sentenceInputs = groupChunksIntoSentences(explicitChunks);
 
       const sentences: Sentence[] = sentenceInputs.map(
         (sentenceInput, sIdx): Sentence => {

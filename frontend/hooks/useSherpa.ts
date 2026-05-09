@@ -357,24 +357,52 @@ export function useSherpa(
 
         const normTarget = normalizeWord(targetWord.text).toLowerCase();
         
+        // [PRODUCTION HARDENING] Tightened Matching Logic
+        // Distance 1 is okay for long words, but 0 (exact) is better for short ones.
+        const targetLen = normTarget.length;
+        
         const dist1 = levenshteinDistance(lastToken, normTarget);
         const dist2 = lastTwoTokens ? levenshteinDistance(lastTwoTokens, normTarget) : 999;
         const dist3 = lastThreeTokens ? levenshteinDistance(lastThreeTokens, normTarget) : 999;
+        
+        // 1. Calculate the Best Distance from single, double, or triple token stitching
         const minDist = Math.min(dist1, dist2, dist3);
-        
-        const targetChunk = curStory.paragraphs[searchCursor.paragraphIndex].sentences[searchCursor.sentenceIndex].chunks[searchCursor.chunkIndex];
-        const isLastWordOfChunk = searchCursor.wordIndex === targetChunk.words.length - 1;
-        
-        const allowedDistance = isLastWordOfChunk ? 3 : 1;
 
-        const isMatch = normTarget.length <= 3 
-            ? (lastToken === normTarget || lastTwoTokens === normTarget || lastThreeTokens === normTarget || (isLastWordOfChunk && minDist <= 1)) 
-            : (minDist <= allowedDistance);
+        let isMatch = false;
+        
+        if (targetLen <= 3) {
+            // Very strict for short words (a, the, in, to) - must be exact
+            isMatch = (lastToken === normTarget || lastTwoTokens === normTarget || lastThreeTokens === normTarget);
+        } else if (targetLen <= 5) {
+            // Medium words (cat, dog, boat) - allow 1 typo maximum
+            isMatch = minDist <= 1;
+        } else {
+            // Long words (gleaming, trophy) - allow 1 typo maximum (used to be 3, which was too loose!)
+            isMatch = minDist <= 1;
+        }
 
         if (isMatch) {
             // Found a match! 
-            // We NO LONGER mark intermediate words as correct automatically. 
-            // This stops the "Flash Jump" behavior.
+            
+            // [V10.0 SMOOTH PULL] 
+            // If we are jumping ahead (e.g. current word was missed but next was found),
+            // we mark all words between current cursor and this match as 'skipped'.
+            // This prevents "Dragging" and ensures the highlight bar stays connected.
+            let pullCursor = { ...cursorRef.current };
+            while (
+                pullCursor.wordIndex !== searchCursor.wordIndex || 
+                pullCursor.chunkIndex !== searchCursor.chunkIndex ||
+                pullCursor.paragraphIndex !== searchCursor.paragraphIndex
+            ) {
+                const missedWord = getWordAtCursor(curStory, pullCursor);
+                if (missedWord && missedWord.status !== "correct") {
+                    missedWord.status = "skipped";
+                }
+                const nextPull = advanceCursor(curStory, pullCursor);
+                if (!nextPull) break;
+                pullCursor = nextPull;
+            }
+
             targetWord.status = "correct";
             correctCountRef.current++;
             setCorrectCount(correctCountRef.current);

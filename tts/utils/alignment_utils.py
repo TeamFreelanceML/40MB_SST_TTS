@@ -32,47 +32,37 @@ def split_paragraph_into_chunks(
     delimiter: str = DEFAULT_CHUNK_DELIMITER,
 ) -> List[str]:
     """
-    Split a paragraph on the given chunk delimiter.
-
-    Default delimiter is "[...]". Clients may pass any custom string
-    (e.g. "||", "---", "<br>"). The delimiter is removed from output.
-
-    Rules:
-        - Delimiter is removed from each chunk.
-        - Each chunk is whitespace-stripped.
-        - Empty chunks after stripping are discarded.
-
-    Examples:
-        split_paragraph_into_chunks("Hello. [...] Goodbye.")
-        → ["Hello.", "Goodbye."]
-
-        split_paragraph_into_chunks("Hello. || Goodbye.", delimiter="||")
-        → ["Hello.", "Goodbye."]
-
-    Args:
-        paragraph_text: Raw paragraph string.
-        delimiter:      Chunk boundary marker. Default "[...]".
-
-    Returns:
-        Ordered list of non-empty trimmed chunk strings.
+    Split a paragraph into chunks for TTS synthesis.
+    Supports: [c], [p], [...], '.', and ','.
     """
-    if delimiter == DEFAULT_CHUNK_DELIMITER:
-        # Use regex for default to allow whitespace variants like "[ ... ]"
-        raw_chunks = _DEFAULT_DELIMITER_PATTERN.split(paragraph_text)
-    else:
-        # Exact string split for custom delimiters
-        raw_chunks = paragraph_text.split(delimiter)
-
-    chunks = [chunk.strip() for chunk in raw_chunks if chunk.strip()]
+    # Smarter regex: matches [c], [p], [...], or punctuation
+    # The dot [.] is only matched if NOT preceded by common titles (Mr, Dr, etc.)
+    # This prevents "Mr. Miller" from being split into two chunks.
+    split_pattern = r"(\[c\]|\[p\]|\[\.\.\.\]|(?<!\bMr)(?<!\bMrs)(?<!\bDr)(?<!\bMs)(?<!\bProf)(?<!\bSt)(?<!\bvs)\.|,)"
+    parts = re.split(split_pattern, paragraph_text)
     
-    # NLP Auto-Chunker Fallback:
-    if len(chunks) == 1 and len(chunks[0].split()) > 15:
-        import re as _nlp_re
-        # Splitting efficiently on (.?!) keeping capitalization and punctuation intact
-        auto_chunks = _nlp_re.split(r'(?<=[.?!])\s+', chunks[0])
-        chunks = [c.strip() for c in auto_chunks if c.strip()]
+    chunks = []
+    current_chunk = ""
+    
+    for i in range(0, len(parts), 2):
+        chunk_content = parts[i]
+        delim = parts[i+1] if i+1 < len(parts) else None
+        current_chunk += chunk_content
         
-    return chunks
+        if delim:
+            if delim in [".", ","]:
+                current_chunk += delim
+                chunks.append(current_chunk.strip())
+                current_chunk = ""
+            elif delim in ["[c]", "[p]", "[...]"]:
+                if current_chunk.strip():
+                    chunks.append(current_chunk.strip())
+                current_chunk = ""
+        else:
+            if current_chunk.strip():
+                chunks.append(current_chunk.strip())
+    
+    return [c for c in chunks if c.strip()]
 
 
 # ─────────────────────────────────────────────────────────────────────────────

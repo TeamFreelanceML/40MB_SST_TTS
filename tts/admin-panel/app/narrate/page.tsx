@@ -20,7 +20,7 @@ const BEAR_TEMPLATE = [
 ];
 
 export default function NarratePage() {
-  const [paragraphs, setParagraphs] = useState<string[]>([""]);
+  const [text, setText] = useState<string>("");
   const [storyId, setStoryId] = useState<number>(0);
   const [storyName, setStoryName] = useState<string>("");
   const [voices, setVoices] = useState<Voice[]>([]);
@@ -61,22 +61,23 @@ export default function NarratePage() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const requestPayload: NarrationRequest = useMemo(() => ({
-    story: { id: storyId, name: storyName },
-    voice: { voice_id: voice, language: "en-US" },
-    speech_config: { wpm: speed },
-    text: { 
-      story_text: paragraphs
-        .filter(p => p.trim())
-        .map((p, i) => ({ para_id: i, para_text: p })) 
-    },
-    output_config: { include_word_timestamps: true, include_chunk_timestamps: true }
-  }), [storyId, storyName, voice, speed, paragraphs]);
+  const requestPayload: NarrationRequest = useMemo(() => {
+    const paras = text.split("[p]").map(p => p.trim()).filter(p => p);
+    return {
+      story: { id: storyId, name: storyName },
+      voice: { voice_id: voice, language: "en-US" },
+      speech_config: { wpm: speed },
+      text: { 
+        story_text: paras.map((p, i) => ({ para_id: i, para_text: p })) 
+      },
+      output_config: { include_word_timestamps: true, include_chunk_timestamps: true }
+    };
+  }, [storyId, storyName, voice, speed, text]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (paragraphs.every(p => !p.trim())) {
-      setError("Please enter at least one paragraph of text.");
+    if (!text.trim()) {
+      setError("Please enter story text.");
       return;
     }
 
@@ -87,7 +88,7 @@ export default function NarratePage() {
     setCurrentResponse({ job_id: "pending", status: "pending" });
 
     try {
-      const { job_id } = await submitNarration(requestPayload);
+      await submitNarration(requestPayload);
       router.push("/");
     } catch (err) {
       console.error(err);
@@ -96,27 +97,8 @@ export default function NarratePage() {
     }
   };
 
-  const updateParagraph = (index: number, value: string) => {
-    const newParas = [...paragraphs];
-    newParas[index] = value;
-    setParagraphs(newParas);
-  };
-
-  const addParagraph = () => {
-    setParagraphs([...paragraphs, ""]);
-  };
-
-  const removeParagraph = (index: number) => {
-    if (paragraphs.length <= 1) return;
-    setParagraphs(paragraphs.filter((_, i) => i !== index));
-  };
-
   if (isSubmitting) {
-    return (
-      <SynthesisLoader 
-        status="pending" 
-      />
-    );
+    return <SynthesisLoader status="pending" />;
   }
 
   return (
@@ -171,7 +153,7 @@ export default function NarratePage() {
               <div className="flex flex-col">
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-2">
                   <FileText className="w-3.5 h-3.5 text-blue-500" />
-                  Script Paragraph Management
+                  STORY SCRIPT CONTENT
                 </label>
                 <div className="flex items-center gap-2 mt-1">
                    <p className="text-xs font-bold text-zinc-200">Story ID: <span className="text-blue-500">#{storyId}</span></p>
@@ -181,7 +163,7 @@ export default function NarratePage() {
               </div>
               <button 
                 type="button"
-                onClick={() => setParagraphs(BEAR_TEMPLATE)}
+                onClick={() => setText(BEAR_TEMPLATE.join(" [p] "))}
                 className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 bg-blue-500/5 px-4 py-2 rounded-xl border border-blue-500/10 transition-all active:scale-95 flex items-center gap-2 shadow-sm"
               >
                 <Sparkles className="w-3.5 h-3.5" />
@@ -189,50 +171,20 @@ export default function NarratePage() {
               </button>
             </div>
 
-            <div className="flex-1 space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-              {paragraphs.map((para, idx) => (
-                <motion.div 
-                  key={idx}
-                  layoutId={`para-${idx}`}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="relative group"
-                >
-                  <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1.5 h-0 bg-blue-500 group-hover:h-8 transition-all rounded-full" />
-                  <div className="flex gap-4">
-                    <div className="flex-1 space-y-2">
-                       <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Paragraph #{idx + 1}</span>
-                       <textarea 
-                         value={para}
-                         onChange={(e) => updateParagraph(idx, e.target.value)}
-                         placeholder={`Enter paragraph text...`}
-                         className="w-full bg-zinc-950/40 border border-zinc-800 focus:border-blue-500/50 rounded-2xl p-5 text-zinc-200 placeholder:text-zinc-800 focus:outline-none transition-all resize-none leading-relaxed text-sm shadow-inner min-h-[100px]"
-                       />
-                    </div>
-                    <button 
-                      onClick={() => removeParagraph(idx)}
-                      disabled={paragraphs.length <= 1}
-                      className="self-end mb-1 p-3 bg-red-500/5 hover:bg-red-500/10 text-red-500/40 hover:text-red-500 border border-red-500/10 rounded-xl transition-all disabled:opacity-0"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
+            <div className="flex-1 flex flex-col">
+               <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1 mb-2">Narrative Content (use [p] for paragraph breaks)</span>
+               <textarea 
+                 value={text}
+                 onChange={(e) => setText(e.target.value)}
+                 placeholder="Paste your story here... use [p] for paragraph markers."
+                 className="flex-1 w-full bg-zinc-950/40 border border-zinc-800 focus:border-blue-500/50 rounded-2xl p-6 text-zinc-200 placeholder:text-zinc-800 focus:outline-none transition-all resize-none leading-relaxed text-sm shadow-inner"
+               />
             </div>
-
-            <button 
-              onClick={addParagraph}
-              className="mt-8 py-4 border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-xs font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 group"
-            >
-              <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
-              Add Narrative Paragraph
-            </button>
           </div>
 
           <button 
             onClick={handleSubmit}
-            disabled={paragraphs.every(p => !p.trim())}
+            disabled={!text.trim()}
             className="w-full bg-zinc-100 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed text-zinc-950 font-black uppercase tracking-[0.2em] py-6 rounded-3xl shadow-xl shadow-white/5 flex items-center justify-center gap-4 transition-all active:scale-[0.98] group"
           >
             <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />

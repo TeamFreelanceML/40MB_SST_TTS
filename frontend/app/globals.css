@@ -138,29 +138,31 @@ body {
   display: inline;
   padding: 2px 1px;
   border-radius: 4px;
-  transition: all 0.3s ease;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: default;
 }
 
 .word-active {
   color: var(--text-primary);
-  font-weight: 500;
+  font-weight: 600;
+  text-decoration: underline !important;
+  text-decoration-color: var(--accent-amber) !important;
+  text-decoration-thickness: 3px !important;
+  text-underline-offset: 4px;
 }
 
-/* Correctly read word — Smooth Emerald Green */
+/* Correctly read word — No longer green, just solid white */
 .word-correct {
-  color: var(--accent-emerald) !important;
-  font-weight: 800 !important;
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
   text-decoration: none !important;
 }
 
-/* Skipped and error words all use the Red Stripe style */
+/* Skipped and error words — Subtle gray instead of bright red */
 .word-skipped, .word-wrong, .word-extra, .word-repeated, .word-unclear {
-  color: var(--accent-rose);
-  text-decoration: line-through;
-  text-decoration-color: var(--accent-rose);
-  text-decoration-thickness: 2px;
-  opacity: 0.7;
+  color: var(--text-muted);
+  text-decoration: none;
+  opacity: 0.5;
 }
 
 /* Pending word — visible but waiting */
@@ -180,10 +182,11 @@ body {
    ------------------------------------------------------------------------- */
 .chunk-active {
   position: relative;
-  background: transparent !important;
-  box-shadow: none !important;
-  border-radius: 0;
-  padding: 0;
+  background: rgba(59, 130, 246, 0.12) !important;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.08) !important;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 0 -4px;
 }
 
 .chunk-complete .word-correct {

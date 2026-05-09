@@ -59,9 +59,6 @@ function preprocessAlignment(alignment: any) {
       const rawWords = c.words || [];
 
       rawWords.forEach((w: any) => {
-        // --- PREMIUM SYNC TUNING ---
-        // 1. Lead-in: Small head start (10% of duration, max 40ms)
-        // 2. Tail: Visual persistence
         const leadIn = Math.min(Math.max(w.end_ms - w.start_ms * 0.10, 10), 40);
         const tolerance = 40; 
 
@@ -72,7 +69,7 @@ function preprocessAlignment(alignment: any) {
           end_ms: w.end_ms,
           duration: w.end_ms - w.start_ms,
           tolerance,
-          effectiveStart: w.start_ms - leadIn, // Premium: 25% head start
+          effectiveStart: w.start_ms - leadIn,
           effectiveEnd: w.end_ms + tolerance,
           chunk_id: c.chunk_id,
           para_id: p.para_id,
@@ -86,12 +83,20 @@ function preprocessAlignment(alignment: any) {
           start_ms: c.start_ms,
           end_ms: c.end_ms,
           effectiveStart: computedWords[0].effectiveStart,
-          effectiveEnd: computedWords[computedWords.length - 1].effectiveEnd + chunkBuffer,
+          effectiveEnd: computedWords[computedWords.length - 1].effectiveEnd,
           words: computedWords
         });
       }
     });
   });
+
+  // Post-process chunks to fill gaps for continuous highlighting
+  for (let i = 0; i < chunks.length - 1; i++) {
+    chunks[i].effectiveEnd = chunks[i+1].effectiveStart;
+  }
+  if (chunks.length > 0) {
+    chunks[chunks.length - 1].effectiveEnd += 1000;
+  }
 
   return { chunks, avgWordDuration };
 }

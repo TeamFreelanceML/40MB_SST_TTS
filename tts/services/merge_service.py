@@ -91,9 +91,9 @@ def _merge_audio_segments_sync(
             else:
                 chunk_text = segment.get("chunk_text", "").strip()
                 if chunk_text.endswith(","):
-                    all_samples.append(_make_silence(150))
+                    all_samples.append(_make_silence(settings.COMMA_PAUSE_MS))
                 elif chunk_text.endswith((".", "?", "!")):
-                    all_samples.append(_make_silence(450))
+                    all_samples.append(_make_silence(settings.DOT_PAUSE_MS))
                 else:
                     all_samples.append(_make_silence(INTER_CHUNK_MS))
 

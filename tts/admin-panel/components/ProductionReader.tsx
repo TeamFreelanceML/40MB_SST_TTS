@@ -156,18 +156,18 @@ export const ProductionReader: React.FC<{ alignment: AlignmentData; audioUrl: st
       
       if (id !== activeIds.word || chunkId !== activeIds.chunk) {
         setActiveIds({ word: id, chunk: chunkId, paragraph: paragraphId });
-        
-        // 4. LOW-LEVEL DOM MANIPULATION (Avoid React Re-renders)
         updateDOM(id, chunkId, paragraphId);
-        
         lastActiveRef.current = { id, time: timestamp };
       }
-    }
- else {
-      if (activeIds.word !== null) {
-        setActiveIds({ word: null, chunk: null, paragraph: null });
-        updateDOM(null, null, null);
-        lastActiveRef.current = { id: null, time: timestamp };
+    } else {
+      // Sticky Logic: Keep the last word highlighted during silence if audio is playing
+      if (!audio.paused && lastActiveRef.current.id) {
+          // No-op: don't clear
+      } else if (audio.paused) {
+          // Clear only if paused or seeked out of range
+          setActiveIds({ word: null, chunk: null, paragraph: null });
+          updateDOM(null, null, null);
+          lastActiveRef.current = { id: null, time: timestamp };
       }
     }
 

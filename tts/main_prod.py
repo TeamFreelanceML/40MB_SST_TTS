@@ -83,8 +83,8 @@ async def _verify_api_key(api_key: str = Security(_API_KEY_HEADER)) -> str:
 # ── Rate limiter ──────────────────────────────────────────────────────────────
 _limiter = Limiter(key_func=get_remote_address)
 
-INTER_CHUNK_MS = settings.INTER_CHUNK_MS
-INTER_PARA_MS  = settings.INTER_PARA_MS
+INTER_CHUNK_MS = 450   # Matches 0.2s-0.6s chunk range
+INTER_PARA_MS  = 2000  # Matches 1.5s-2.5s paragraph range
 FRAME_MS       = settings.FRAME_MS
 MIN_WORD_MS    = settings.MIN_WORD_DURATION_MS
 
@@ -432,9 +432,9 @@ def _assemble_response(
             if not is_last_in_para:
                 chunk_text = chunk_result.get("chunk_text", "").strip()
                 if chunk_text.endswith(","):
-                    stream_cursor_ms += 150
+                    stream_cursor_ms += settings.COMMA_PAUSE_MS
                 elif chunk_text.endswith((".", "?", "!")):
-                    stream_cursor_ms += 450
+                    stream_cursor_ms += settings.DOT_PAUSE_MS
                 else:
                     stream_cursor_ms += INTER_CHUNK_MS
 
