@@ -564,7 +564,7 @@ export default function ResultsPage() {
                             Actual Chunk
                           </div>
                           <div className="mt-3 max-h-40 overflow-y-auto pr-1 text-lg leading-8 text-white">
-                            {chunk.expected_text}
+                            {chunk.expected_text.replace(/\[c\]|\[p\]|\[\.\.\.\]/g, "")}
                           </div>
                         </div>
 
