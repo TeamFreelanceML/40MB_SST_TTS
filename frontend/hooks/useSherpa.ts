@@ -361,31 +361,33 @@ export function useSherpa(
         if (!normToken || normToken.length < 1) continue;
 
         let searchCursor = { ...activeCursor };
-        // IRON-CLAD WINDOW: Only check 2 words ahead to stop all jumping.
-        for (let lookahead = 0; lookahead < 2; lookahead++) {
+        // V21.0 PRODUCTION SOLUTION: 4-word window with Anchor-Weighted Strictness
+        for (let lookahead = 0; lookahead < 4; lookahead++) {
             const targetWord = getWordAtCursor(curStory, searchCursor);
             if (!targetWord) break;
 
-            // [V20.0 HARD PARAGRAPH WALL]
-            // Physically prevent any movement to the next paragraph until the current one is done.
-            if (searchCursor.paragraphIndex !== activeCursor.paragraphIndex) {
-                break; 
-            }
+            // [HARD PARAGRAPH WALL]
+            if (searchCursor.paragraphIndex !== activeCursor.paragraphIndex) break; 
 
             const normTarget = normalizeWord(targetWord.text).toLowerCase();
             const dist = levenshteinDistance(normToken, normTarget);
             
-            // EXTREME FORGIVENESS (3 TYPOS)
-            // This guarantees it will NEVER STICK.
-            let isMatch = (dist <= 3); 
-            if (!isMatch && normToken.length >= 2) {
+            // PROGRESSIVE STRICTNESS:
+            // Word 1: 3 typos (Zero Sticking)
+            // Word 2: 1 typo (Safe Jump)
+            // Word 3 & 4: 0 typos (Strict Jump)
+            const maxDist = (lookahead === 0) ? 3 : (lookahead === 1 ? 1 : 0);
+
+            let isMatch = (dist <= maxDist); 
+            
+            // Allow prefix matches only for the current word to prevent runaway jumps
+            if (!isMatch && lookahead === 0 && normToken.length >= 2) {
                 if (normTarget.startsWith(normToken) || normToken.startsWith(normTarget)) {
                     isMatch = true; 
                 }
             }
 
             if (isMatch && targetWord.status !== "correct") {
-                // MATCH! Move the underline
                 targetWord.status = "correct";
                 correctCountRef.current++;
                 matchCountInThisPass++;
