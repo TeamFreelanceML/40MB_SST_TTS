@@ -361,28 +361,26 @@ export function useSherpa(
         if (!normToken || normToken.length < 1) continue;
 
         let searchCursor = { ...activeCursor };
-        // ULTRA-TIGHT WINDOW: Only check current word and 1 next word
-        for (let lookahead = 0; lookahead < 2; lookahead++) {
+        // ULTRA-GREEDY WINDOW: Check up to 10 words ahead!
+        for (let lookahead = 0; lookahead < 10; lookahead++) {
             const targetWord = getWordAtCursor(curStory, searchCursor);
             if (!targetWord) break;
 
             const normTarget = normalizeWord(targetWord.text).toLowerCase();
             const dist = levenshteinDistance(normToken, normTarget);
             
-            // FORGIVING BUT FOCUSED
-            let isMatch = false;
-            if (normTarget.length <= 3) {
-                isMatch = (normToken === normTarget); // Exact for short words to prevent talk-triggers
-            } else {
-                isMatch = (dist <= 1); // 1 typo allowed for everything else
+            // INSANELY FORGIVING MATCHING
+            // If it sounds remotely like the word, or shares a prefix, it's a match.
+            let isMatch = (dist <= 2); 
+            
+            if (!isMatch && normToken.length >= 2) {
+                if (normTarget.startsWith(normToken) || normToken.startsWith(normTarget)) {
+                    isMatch = true; 
+                }
             }
 
             if (isMatch && targetWord.status !== "correct") {
-                // [V16.0 PURE TRACKING]
-                // We NO LONGER mark words as "skipped". 
-                // We just mark the found word as "correct" and move the underline.
-                // This stops all "Jumping" visuals.
-
+                // MATCH! Force move the highlighter
                 targetWord.status = "correct";
                 correctCountRef.current++;
                 matchCountInThisPass++;
