@@ -485,6 +485,7 @@ export function useSherpa(
     correctCountRef.current = 0;
     setCorrectCount(0);
     ignitionStartTimeRef.current = null;
+    lastProcessedTokenIndexRef.current = 0;
   }, []);
 
   const advanceManual = useCallback((newStatus: "correct" | "skipped") => {
