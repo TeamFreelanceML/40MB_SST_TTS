@@ -361,18 +361,24 @@ export function useSherpa(
         if (!normToken || normToken.length < 1) continue;
 
         let searchCursor = { ...activeCursor };
-        // ULTRA-GREEDY WINDOW: Check up to 10 words ahead!
-        for (let lookahead = 0; lookahead < 10; lookahead++) {
+        // SMART-TRACKER WINDOW: 4 words is the "Sweet Spot" for no-stick AND no-jump.
+        for (let lookahead = 0; lookahead < 4; lookahead++) {
             const targetWord = getWordAtCursor(curStory, searchCursor);
             if (!targetWord) break;
+
+            // [V17.0 PARAGRAPH LOCK]
+            // Don't jump to a new paragraph unless we are near the end of the current one
+            if (searchCursor.paragraphIndex !== activeCursor.paragraphIndex) {
+                // Only allow the jump if the token is a strong match for the start of the next para
+                // and we are not stuck in the middle of a sentence.
+                break; 
+            }
 
             const normTarget = normalizeWord(targetWord.text).toLowerCase();
             const dist = levenshteinDistance(normToken, normTarget);
             
-            // INSANELY FORGIVING MATCHING
-            // If it sounds remotely like the word, or shares a prefix, it's a match.
+            // STAY LOOSE (NO STRICTNESS)
             let isMatch = (dist <= 2); 
-            
             if (!isMatch && normToken.length >= 2) {
                 if (normTarget.startsWith(normToken) || normToken.startsWith(normTarget)) {
                     isMatch = true; 
@@ -380,7 +386,7 @@ export function useSherpa(
             }
 
             if (isMatch && targetWord.status !== "correct") {
-                // MATCH! Force move the highlighter
+                // MATCH! Move the underline
                 targetWord.status = "correct";
                 correctCountRef.current++;
                 matchCountInThisPass++;
