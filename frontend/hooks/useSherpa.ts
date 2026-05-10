@@ -352,12 +352,17 @@ export function useSherpa(
     
     // Attempt to match tokens sequentially
     for (const token of recentTokens) {
+        // [V13.0 VELOCITY CAP]
+        // Stop matching if we've already moved 3 words in this single 125ms update.
+        // This prevents the "Teleport" effect caused by noise.
+        if (matchCountInThisPass >= 3) break;
+
         const normToken = normalizeWord(token).toLowerCase();
         if (!normToken) continue;
 
-        // Search window: check the current word and the next 3 words
+        // Search window: check only the current word and the next 2 words (Tightened from 4)
         let searchCursor = { ...activeCursor };
-        for (let lookahead = 0; lookahead < 4; lookahead++) {
+        for (let lookahead = 0; lookahead < 3; lookahead++) {
             const targetWord = getWordAtCursor(curStory, searchCursor);
             if (!targetWord) break;
 
