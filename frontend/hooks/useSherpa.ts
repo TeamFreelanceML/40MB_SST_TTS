@@ -334,100 +334,83 @@ export function useSherpa(
   // [V9.0 WINDOW SEARCH ENGINE]
   // This engine scans the recent transcript to find matches.
   // It is immune to background noise because it can 'skip' over random words.
+  /**
+   * [V11.0 SEQUENTIAL MULTI-TOKEN MATCHER]
+   * Scans the transcript and matches words one-by-one.
+   * This is much smoother because it handles cases where the AI returns 
+   * multiple words in a single block.
+   */
   const scanForMatches = useCallback((allTokens: string[]) => {
     if (!storyRef.current || allTokens.length === 0) return;
     
-    // GOLD STANDARD: Token Stitching for partial words
-    const lastToken = normalizeWord(allTokens[allTokens.length - 1]).toLowerCase();
-    const lastTwoTokens = allTokens.length > 1 ? normalizeWord(allTokens[allTokens.length - 2] + allTokens[allTokens.length - 1]).toLowerCase() : "";
-    const lastThreeTokens = allTokens.length > 2 ? normalizeWord(allTokens[allTokens.length - 3] + allTokens[allTokens.length - 2] + allTokens[allTokens.length - 1]).toLowerCase() : "";
-    if (!lastToken) return;
-
     const curStory = { ...storyRef.current };
     let activeCursor = { ...cursorRef.current };
-    let matchFound = false;
+    let matchCountInThisPass = 0;
 
-    // GOLD STANDARD: Search only 5 words ahead from the current cursor.
-    let searchCursor = { ...activeCursor };
+    // We only care about the last ~10 tokens to avoid expensive re-scanning
+    const recentTokens = allTokens.slice(-10);
     
-    // PRODUCTION HARDENING: Narrower window (2 words) to prevent "Jumping"
-    for (let i = 0; i < 2; i++) {
-        const targetWord = getWordAtCursor(curStory, searchCursor);
-        if (!targetWord) break;
+    // Attempt to match tokens sequentially
+    for (const token of recentTokens) {
+        const normToken = normalizeWord(token).toLowerCase();
+        if (!normToken) continue;
 
-        const normTarget = normalizeWord(targetWord.text).toLowerCase();
-        
-        // [PRODUCTION HARDENING] Tightened Matching Logic
-        // Distance 1 is okay for long words, but 0 (exact) is better for short ones.
-        const targetLen = normTarget.length;
-        
-        const dist1 = levenshteinDistance(lastToken, normTarget);
-        const dist2 = lastTwoTokens ? levenshteinDistance(lastTwoTokens, normTarget) : 999;
-        const dist3 = lastThreeTokens ? levenshteinDistance(lastThreeTokens, normTarget) : 999;
-        
-        // 1. Calculate the Best Distance from single, double, or triple token stitching
-        const minDist = Math.min(dist1, dist2, dist3);
+        // Search window: check the current word and the next 3 words
+        let searchCursor = { ...activeCursor };
+        for (let lookahead = 0; lookahead < 4; lookahead++) {
+            const targetWord = getWordAtCursor(curStory, searchCursor);
+            if (!targetWord) break;
 
-        let isMatch = false;
-        
-        if (targetLen <= 3) {
-            // Very strict for short words (a, the, in, to) - must be exact
-            isMatch = (lastToken === normTarget || lastTwoTokens === normTarget || lastThreeTokens === normTarget);
-        } else if (targetLen <= 5) {
-            // Medium words (cat, dog, boat) - allow 1 typo maximum
-            isMatch = minDist <= 1;
-        } else {
-            // Long words (gleaming, trophy) - allow 1 typo maximum (used to be 3, which was too loose!)
-            isMatch = minDist <= 1;
-        }
-
-        if (isMatch) {
-            // Found a match! 
+            const normTarget = normalizeWord(targetWord.text).toLowerCase();
+            const dist = levenshteinDistance(normToken, normTarget);
             
-            // [V10.0 SMOOTH PULL] 
-            // If we are jumping ahead (e.g. current word was missed but next was found),
-            // we mark all words between current cursor and this match as 'skipped'.
-            // This prevents "Dragging" and ensures the highlight bar stays connected.
-            let pullCursor = { ...cursorRef.current };
-            while (
-                pullCursor.wordIndex !== searchCursor.wordIndex || 
-                pullCursor.chunkIndex !== searchCursor.chunkIndex ||
-                pullCursor.paragraphIndex !== searchCursor.paragraphIndex
-            ) {
-                const missedWord = getWordAtCursor(curStory, pullCursor);
-                if (missedWord && missedWord.status !== "correct") {
-                    missedWord.status = "skipped";
+            // Stricter matching logic
+            const isMatch = normTarget.length <= 3 
+                ? (normToken === normTarget) 
+                : (dist <= 1);
+
+            if (isMatch && targetWord.status !== "correct") {
+                // Match found! 
+                
+                // Mark skipped words if we jumped ahead
+                let pullCursor = { ...activeCursor };
+                while (
+                    pullCursor.wordIndex !== searchCursor.wordIndex || 
+                    pullCursor.chunkIndex !== searchCursor.chunkIndex ||
+                    pullCursor.paragraphIndex !== searchCursor.paragraphIndex
+                ) {
+                    const missedWord = getWordAtCursor(curStory, pullCursor);
+                    if (missedWord && missedWord.status === "pending") {
+                        missedWord.status = "skipped";
+                    }
+                    const nextPull = advanceCursor(curStory, pullCursor);
+                    if (!nextPull) break;
+                    pullCursor = nextPull;
                 }
-                const nextPull = advanceCursor(curStory, pullCursor);
-                if (!nextPull) break;
-                pullCursor = nextPull;
+
+                targetWord.status = "correct";
+                correctCountRef.current++;
+                matchCountInThisPass++;
+                
+                const next = advanceCursor(curStory, searchCursor);
+                if (next) {
+                    const nextWord = getWordAtCursor(curStory, next);
+                    if (nextWord) nextWord.status = "active";
+                    activeCursor = next;
+                } else {
+                    activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
+                }
+                break; // Move to the next token in the transcript
             }
 
-            targetWord.status = "correct";
-            correctCountRef.current++;
-            setCorrectCount(correctCountRef.current);
-            
-            // Move cursor to the NEXT word
-            const next = advanceCursor(curStory, searchCursor);
-            if (next) {
-                const nextWord = getWordAtCursor(curStory, next);
-                if (nextWord) nextWord.status = "active";
-                activeCursor = next;
-            } else {
-                activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
-            }
-
-            matchFound = true;
-            break; 
+            const nextInWindow = advanceCursor(curStory, searchCursor);
+            if (!nextInWindow) break;
+            searchCursor = nextInWindow;
         }
-
-        // Move to next word for lookahead window
-        const nextInWindow = advanceCursor(curStory, searchCursor);
-        if (!nextInWindow) break;
-        searchCursor = nextInWindow;
     }
 
-    if (matchFound) {
+    if (matchCountInThisPass > 0) {
+      setCorrectCount(correctCountRef.current);
       setCursor(activeCursor);
       cursorRef.current = activeCursor;
       setStory(curStory);
@@ -563,7 +546,7 @@ export function useSherpa(
       compressor.attack.setValueAtTime(0, audioContext.currentTime);
       compressor.release.setValueAtTime(0.25, audioContext.currentTime);
 
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      const processor = audioContext.createScriptProcessor(2048, 1, 1);
 
       source.connect(filter);
       filter.connect(compressor);
