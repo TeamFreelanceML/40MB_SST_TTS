@@ -334,58 +334,55 @@ export function useSherpa(
   // [V9.0 WINDOW SEARCH ENGINE]
   // This engine scans the recent transcript to find matches.
   // It is immune to background noise because it can 'skip' over random words.
+  const lastProcessedTokenIndexRef = useRef<number>(0);
+
   /**
-   * [V11.0 SEQUENTIAL MULTI-TOKEN MATCHER]
-   * Scans the transcript and matches words one-by-one.
-   * This is much smoother because it handles cases where the AI returns 
-   * multiple words in a single block.
+   * [V14.0 SMART SEQUENCE MATCHER]
+   * Only processes NEW tokens. 
+   * Prevents re-highlighting and "accidental talk" triggers.
    */
   const scanForMatches = useCallback((allTokens: string[]) => {
     if (!storyRef.current || allTokens.length === 0) return;
     
+    // 1. Only process tokens we haven't seen before
+    const newTokens = allTokens.slice(lastProcessedTokenIndexRef.current);
+    if (newTokens.length === 0) return;
+
     const curStory = { ...storyRef.current };
     let activeCursor = { ...cursorRef.current };
     let matchCountInThisPass = 0;
+    let tokensConsumed = 0;
 
-    // We care about the last ~20 tokens to handle fast bursts of speech
-    const recentTokens = allTokens.slice(-20);
-    
-    // Attempt to match tokens sequentially
-    for (const token of recentTokens) {
-        // [V13.0 VELOCITY CAP]
-        // Stop matching if we've already moved 3 words in this single 125ms update.
-        // This prevents the "Teleport" effect caused by noise.
-        if (matchCountInThisPass >= 3) break;
+    for (const token of newTokens) {
+        tokensConsumed++;
+        if (matchCountInThisPass >= 3) break; // Velocity Cap
 
         const normToken = normalizeWord(token).toLowerCase();
-        if (!normToken) continue;
+        if (!normToken || normToken.length < 1) continue;
 
-        // Search window: check only the current word and the next 2 words (Tightened from 4)
         let searchCursor = { ...activeCursor };
+        // Narrow lookahead (2 words) for "Talking" suppression
         for (let lookahead = 0; lookahead < 3; lookahead++) {
             const targetWord = getWordAtCursor(curStory, searchCursor);
             if (!targetWord) break;
 
             const normTarget = normalizeWord(targetWord.text).toLowerCase();
-            const dist = levenshteinDistance(normToken, normTarget);
             
-            // Stricter matching logic
-            let isMatch = normTarget.length <= 3 
-                ? (normToken === normTarget) 
-                : (dist <= 1);
-
-            // [V12.0 HYPER-RESPONSIVE PREFIX MATCH]
-            // If it's a long word and we have a strong prefix match, count it!
+            // HYPER-RESPONSIVE MATCHING
+            const dist = levenshteinDistance(normToken, normTarget);
+            let isMatch = normTarget.length <= 3 ? (normToken === normTarget) : (dist <= 1);
+            
+            // Prefix support for long words
             if (!isMatch && normTarget.length > 5 && normToken.length >= 4) {
-                if (normTarget.startsWith(normToken) || normToken.startsWith(normTarget)) {
-                    isMatch = true; 
-                }
+                if (normTarget.startsWith(normToken)) isMatch = true;
             }
 
             if (isMatch && targetWord.status !== "correct") {
-                // Match found! 
+                // If we are jumping ahead (lookahead > 0), 
+                // we should be extra careful it's not just "random talk".
+                // But as per user request: "no need to validate... just check if read".
+                // So we will pull forward.
                 
-                // Mark skipped words if we jumped ahead
                 let pullCursor = { ...activeCursor };
                 while (
                     pullCursor.wordIndex !== searchCursor.wordIndex || 
@@ -413,7 +410,7 @@ export function useSherpa(
                 } else {
                     activeCursor = { paragraphIndex: -1, sentenceIndex: -1, chunkIndex: -1, wordIndex: -1 };
                 }
-                break; // Move to the next token in the transcript
+                break; 
             }
 
             const nextInWindow = advanceCursor(curStory, searchCursor);
@@ -421,6 +418,9 @@ export function useSherpa(
             searchCursor = nextInWindow;
         }
     }
+
+    // Update the index so we don't process these tokens again
+    lastProcessedTokenIndexRef.current += tokensConsumed;
 
     if (matchCountInThisPass > 0) {
       setCorrectCount(correctCountRef.current);
