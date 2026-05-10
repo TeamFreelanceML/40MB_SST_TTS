@@ -361,50 +361,32 @@ export function useSherpa(
         if (!normToken || normToken.length < 1) continue;
 
         let searchCursor = { ...activeCursor };
-        // Lookahead 3 words for better flow
-        for (let lookahead = 0; lookahead < 4; lookahead++) {
+        // ULTRA-TIGHT WINDOW: Only check current word and 1 next word
+        for (let lookahead = 0; lookahead < 2; lookahead++) {
             const targetWord = getWordAtCursor(curStory, searchCursor);
             if (!targetWord) break;
 
             const normTarget = normalizeWord(targetWord.text).toLowerCase();
             const dist = levenshteinDistance(normToken, normTarget);
             
-            // SUPER FORGIVING THRESHOLDS
+            // FORGIVING BUT FOCUSED
             let isMatch = false;
             if (normTarget.length <= 3) {
-                isMatch = (dist <= 1); // Forgiving even for "the/a/of"
-            } else if (normTarget.length <= 6) {
-                isMatch = (dist <= 1);
+                isMatch = (normToken === normTarget); // Exact for short words to prevent talk-triggers
             } else {
-                isMatch = (dist <= 2); // Extremely forgiving for long words
-            }
-            
-            // Prefix support (e.g. "sta" matches "stared")
-            if (!isMatch && normToken.length >= 2 && normTarget.startsWith(normToken)) {
-                isMatch = true;
+                isMatch = (dist <= 1); // 1 typo allowed for everything else
             }
 
             if (isMatch && targetWord.status !== "correct") {
-                // Match found! Mark as correct and pull forward
-                let pullCursor = { ...activeCursor };
-                while (
-                    pullCursor.wordIndex !== searchCursor.wordIndex || 
-                    pullCursor.chunkIndex !== searchCursor.chunkIndex ||
-                    pullCursor.paragraphIndex !== searchCursor.paragraphIndex
-                ) {
-                    const missedWord = getWordAtCursor(curStory, pullCursor);
-                    if (missedWord && missedWord.status === "pending") {
-                        missedWord.status = "skipped";
-                    }
-                    const nextPull = advanceCursor(curStory, pullCursor);
-                    if (!nextPull) break;
-                    pullCursor = nextPull;
-                }
+                // [V16.0 PURE TRACKING]
+                // We NO LONGER mark words as "skipped". 
+                // We just mark the found word as "correct" and move the underline.
+                // This stops all "Jumping" visuals.
 
                 targetWord.status = "correct";
                 correctCountRef.current++;
                 matchCountInThisPass++;
-                lastMatchTokenRelativeIndex = i; // Mark where we stopped
+                lastMatchTokenRelativeIndex = i; 
                 
                 const next = advanceCursor(curStory, searchCursor);
                 if (next) {

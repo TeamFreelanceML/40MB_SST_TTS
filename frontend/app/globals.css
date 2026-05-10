@@ -156,25 +156,23 @@ body {
   color: var(--text-primary) !important;
   font-weight: 500 !important;
   text-decoration: none !important;
+  border-bottom: none !important;
 }
 
 /* Skipped and error words — Subtle gray instead of bright red */
 .word-skipped, .word-wrong, .word-extra, .word-repeated, .word-unclear {
-  color: var(--text-muted);
-  text-decoration: none;
+  color: var(--text-muted) !important;
+  text-decoration: none !important;
+  border-bottom: none !important;
   opacity: 0.5;
 }
 
 /* Pending word — visible but waiting */
-.word-pending {
+.word-pending, .word-pending-visible {
   color: var(--text-primary);
+  text-decoration: none !important;
+  border-bottom: none !important;
   opacity: 0.85;
-}
-
-/* Pending word in active chunk — slightly brighter */
-.word-pending-visible {
-  color: var(--text-primary);
-  opacity: 0.95;
 }
 
 /* -------------------------------------------------------------------------
