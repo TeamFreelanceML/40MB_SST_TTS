@@ -365,9 +365,17 @@ export function useSherpa(
             const dist = levenshteinDistance(normToken, normTarget);
             
             // Stricter matching logic
-            const isMatch = normTarget.length <= 3 
+            let isMatch = normTarget.length <= 3 
                 ? (normToken === normTarget) 
                 : (dist <= 1);
+
+            // [V12.0 HYPER-RESPONSIVE PREFIX MATCH]
+            // If it's a long word and we have a strong prefix match, count it!
+            if (!isMatch && normTarget.length > 5 && normToken.length >= 4) {
+                if (normTarget.startsWith(normToken) || normToken.startsWith(normTarget)) {
+                    isMatch = true; 
+                }
+            }
 
             if (isMatch && targetWord.status !== "correct") {
                 // Match found! 
