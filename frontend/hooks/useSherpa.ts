@@ -353,24 +353,23 @@ export function useSherpa(
     let matchCountInThisPass = 0;
     let lastMatchTokenRelativeIndex = -1;
 
-    for (let i = 0; i < newTokens.length; i++) {
+        for (let i = 0; i < newTokens.length; i++) {
         const token = newTokens[i];
-        if (matchCountInThisPass >= 5) break; // Increased Velocity Cap for speed
+        if (matchCountInThisPass >= 10) break; // [V19.0 SPEED BOOST] High speed limit for fast readers
 
         const normToken = normalizeWord(token).toLowerCase();
         if (!normToken || normToken.length < 1) continue;
 
         let searchCursor = { ...activeCursor };
-        // SMART-TRACKER WINDOW: 4 words is the "Sweet Spot" for no-stick AND no-jump.
+        // SMART-TRACKER WINDOW
         for (let lookahead = 0; lookahead < 4; lookahead++) {
             const targetWord = getWordAtCursor(curStory, searchCursor);
             if (!targetWord) break;
 
-            // [V17.0 PARAGRAPH LOCK]
-            // Don't jump to a new paragraph unless we are near the end of the current one
-            if (searchCursor.paragraphIndex !== activeCursor.paragraphIndex) {
-                // Only allow the jump if the token is a strong match for the start of the next para
-                // and we are not stuck in the middle of a sentence.
+            // [V19.0 LOGIC FIX]
+            // Only lock the paragraph if we are trying to skip a LARGE distance.
+            // If the next word is just the first word of the next para, ALLOW IT.
+            if (searchCursor.paragraphIndex !== activeCursor.paragraphIndex && lookahead > 1) {
                 break; 
             }
 
