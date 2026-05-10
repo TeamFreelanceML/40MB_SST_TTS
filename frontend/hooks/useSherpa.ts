@@ -347,8 +347,8 @@ export function useSherpa(
     let activeCursor = { ...cursorRef.current };
     let matchCountInThisPass = 0;
 
-    // We only care about the last ~10 tokens to avoid expensive re-scanning
-    const recentTokens = allTokens.slice(-10);
+    // We care about the last ~20 tokens to handle fast bursts of speech
+    const recentTokens = allTokens.slice(-20);
     
     // Attempt to match tokens sequentially
     for (const token of recentTokens) {
