@@ -361,29 +361,23 @@ export function useSherpa(
         if (!normToken || normToken.length < 1) continue;
 
         let searchCursor = { ...activeCursor };
-        // SMART-TRACKER WINDOW
-        for (let lookahead = 0; lookahead < 4; lookahead++) {
+        // IRON-CLAD WINDOW: Only check 2 words ahead to stop all jumping.
+        for (let lookahead = 0; lookahead < 2; lookahead++) {
             const targetWord = getWordAtCursor(curStory, searchCursor);
             if (!targetWord) break;
 
-            // [V19.0 LOGIC FIX]
-            // Only lock the paragraph if we are trying to skip a LARGE distance.
-            // If the next word is just the first word of the next para, ALLOW IT.
-            if (searchCursor.paragraphIndex !== activeCursor.paragraphIndex && lookahead > 1) {
+            // [V20.0 HARD PARAGRAPH WALL]
+            // Physically prevent any movement to the next paragraph until the current one is done.
+            if (searchCursor.paragraphIndex !== activeCursor.paragraphIndex) {
                 break; 
             }
 
             const normTarget = normalizeWord(targetWord.text).toLowerCase();
             const dist = levenshteinDistance(normToken, normTarget);
             
-            // [V18.0 FINAL WORD BOOST]
-            // If this is the last word of a chunk, be EVEN MORE forgiving (3 typos allowed)
-            const nextCheck = advanceCursor(curStory, searchCursor);
-            const isLastOfChunk = !nextCheck || nextCheck.chunkIndex !== searchCursor.chunkIndex;
-            const threshold = isLastOfChunk ? 3 : 2;
-
-            // STAY LOOSE (NO STRICTNESS)
-            let isMatch = (dist <= threshold); 
+            // EXTREME FORGIVENESS (3 TYPOS)
+            // This guarantees it will NEVER STICK.
+            let isMatch = (dist <= 3); 
             if (!isMatch && normToken.length >= 2) {
                 if (normTarget.startsWith(normToken) || normToken.startsWith(normTarget)) {
                     isMatch = true; 
