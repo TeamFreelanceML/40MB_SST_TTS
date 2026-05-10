@@ -337,52 +337,55 @@ export function useSherpa(
   const lastProcessedTokenIndexRef = useRef<number>(0);
 
   /**
-   * [V14.0 SMART SEQUENCE MATCHER]
-   * Only processes NEW tokens. 
-   * Prevents re-highlighting and "accidental talk" triggers.
+   * [V15.0 SUPER FORGIVING MATCHER]
+   * Only consumes tokens that result in a match.
+   * Extremely relaxed distance thresholds for smooth flow.
    */
   const scanForMatches = useCallback((allTokens: string[]) => {
     if (!storyRef.current || allTokens.length === 0) return;
     
-    // 1. Only process tokens we haven't seen before
+    // We scan from the last processed index
     const newTokens = allTokens.slice(lastProcessedTokenIndexRef.current);
     if (newTokens.length === 0) return;
 
     const curStory = { ...storyRef.current };
     let activeCursor = { ...cursorRef.current };
     let matchCountInThisPass = 0;
-    let tokensConsumed = 0;
+    let lastMatchTokenRelativeIndex = -1;
 
-    for (const token of newTokens) {
-        tokensConsumed++;
-        if (matchCountInThisPass >= 3) break; // Velocity Cap
+    for (let i = 0; i < newTokens.length; i++) {
+        const token = newTokens[i];
+        if (matchCountInThisPass >= 5) break; // Increased Velocity Cap for speed
 
         const normToken = normalizeWord(token).toLowerCase();
         if (!normToken || normToken.length < 1) continue;
 
         let searchCursor = { ...activeCursor };
-        // Narrow lookahead (2 words) for "Talking" suppression
-        for (let lookahead = 0; lookahead < 3; lookahead++) {
+        // Lookahead 3 words for better flow
+        for (let lookahead = 0; lookahead < 4; lookahead++) {
             const targetWord = getWordAtCursor(curStory, searchCursor);
             if (!targetWord) break;
 
             const normTarget = normalizeWord(targetWord.text).toLowerCase();
-            
-            // HYPER-RESPONSIVE MATCHING
             const dist = levenshteinDistance(normToken, normTarget);
-            let isMatch = normTarget.length <= 3 ? (normToken === normTarget) : (dist <= 1);
             
-            // Prefix support for long words
-            if (!isMatch && normTarget.length > 5 && normToken.length >= 4) {
-                if (normTarget.startsWith(normToken)) isMatch = true;
+            // SUPER FORGIVING THRESHOLDS
+            let isMatch = false;
+            if (normTarget.length <= 3) {
+                isMatch = (dist <= 1); // Forgiving even for "the/a/of"
+            } else if (normTarget.length <= 6) {
+                isMatch = (dist <= 1);
+            } else {
+                isMatch = (dist <= 2); // Extremely forgiving for long words
+            }
+            
+            // Prefix support (e.g. "sta" matches "stared")
+            if (!isMatch && normToken.length >= 2 && normTarget.startsWith(normToken)) {
+                isMatch = true;
             }
 
             if (isMatch && targetWord.status !== "correct") {
-                // If we are jumping ahead (lookahead > 0), 
-                // we should be extra careful it's not just "random talk".
-                // But as per user request: "no need to validate... just check if read".
-                // So we will pull forward.
-                
+                // Match found! Mark as correct and pull forward
                 let pullCursor = { ...activeCursor };
                 while (
                     pullCursor.wordIndex !== searchCursor.wordIndex || 
@@ -401,6 +404,7 @@ export function useSherpa(
                 targetWord.status = "correct";
                 correctCountRef.current++;
                 matchCountInThisPass++;
+                lastMatchTokenRelativeIndex = i; // Mark where we stopped
                 
                 const next = advanceCursor(curStory, searchCursor);
                 if (next) {
@@ -419,15 +423,17 @@ export function useSherpa(
         }
     }
 
-    // Update the index so we don't process these tokens again
-    lastProcessedTokenIndexRef.current += tokensConsumed;
-
-    if (matchCountInThisPass > 0) {
-      setCorrectCount(correctCountRef.current);
-      setCursor(activeCursor);
-      cursorRef.current = activeCursor;
-      setStory(curStory);
-      storyRef.current = curStory;
+    // [CRITICAL FIX] Only advance the token index up to the last successful match.
+    // This ensures that "unmatched" tokens at the end of the transcript (partial words)
+    // stay available for the next update when they become complete.
+    if (lastMatchTokenRelativeIndex !== -1) {
+        lastProcessedTokenIndexRef.current += (lastMatchTokenRelativeIndex + 1);
+        
+        setCorrectCount(correctCountRef.current);
+        setCursor(activeCursor);
+        cursorRef.current = activeCursor;
+        setStory(curStory);
+        storyRef.current = curStory;
     }
   }, [setCursor, setStory]);
 
