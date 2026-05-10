@@ -377,8 +377,14 @@ export function useSherpa(
             const normTarget = normalizeWord(targetWord.text).toLowerCase();
             const dist = levenshteinDistance(normToken, normTarget);
             
+            // [V18.0 FINAL WORD BOOST]
+            // If this is the last word of a chunk, be EVEN MORE forgiving (3 typos allowed)
+            const nextCheck = advanceCursor(curStory, searchCursor);
+            const isLastOfChunk = !nextCheck || nextCheck.chunkIndex !== searchCursor.chunkIndex;
+            const threshold = isLastOfChunk ? 3 : 2;
+
             // STAY LOOSE (NO STRICTNESS)
-            let isMatch = (dist <= 2); 
+            let isMatch = (dist <= threshold); 
             if (!isMatch && normToken.length >= 2) {
                 if (normTarget.startsWith(normToken) || normToken.startsWith(normTarget)) {
                     isMatch = true; 
